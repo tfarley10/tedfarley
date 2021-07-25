@@ -1,6 +1,6 @@
 baseURL: https://tedfarley.netlify.app/
 languageCode: en-us
-title: Minimal
+title: ted's blog
 theme: minimal
 disqusShortname: username
 googleAnalytics: ''
@@ -8,7 +8,7 @@ params:
   accent: red
   author: Calin Tataru
   backgroundColor: white
-  description: Personal blog theme powered by Hugo
+  description: 
   font: Raleway
   githubUsername: '#'
   highlight: yes
@@ -18,6 +18,8 @@ params:
     - kotlin
     - scala
     - swift
+    - sql
+    - r
   highlightStyle: default
   showBorder: yes
 menu:
@@ -26,17 +28,17 @@ menu:
       url: mailto:me@example.com
       weight: 1
     - name: fab fa-github
-      url: https://github.com/username/
+      url: https://github.com/tfarley10/
       weight: 2
-    - name: fab fa-twitter
-      url: https://twitter.com/username/
-      weight: 3
+    # - name: fab fa-twitter
+    #   url: https://twitter.com/username/
+      # weight: 3
     - name: fab fa-linkedin
-      url: https://www.linkedin.com/in/username/
+      url: https://www.linkedin.com/in/ted-farley/
       weight: 4
-    - name: fab fa-stack-overflow
-      url: https://www.stackoverflow.com/username/
-      weight: 5
+    # - name: fab fa-stack-overflow
+    #   url: https://www.stackoverflow.com/username/
+    #   weight: 5
   main:
     - name: Home
       url: /
@@ -47,6 +49,6 @@ menu:
     - name: Posts
       url: /post/
       weight: 3
-    - name: Projects
-      url: /project/
-      weight: 4
+    # - name: Projects
+    #   url: /project/
+    #   weight: 4
