@@ -1,0 +1,515 @@
+---
+title: Are old apartments cheaper?...Exploring Streeteasy Data
+author: ''
+date: '2020-09-26'
+slug: []
+categories: []
+tags: [housing]
+---
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+```
+
+```{r libs}
+library(tidyverse)
+library(gt)
+library(here)
+```
+
+
+
+
+```{r data, cache = T}
+
+
+
+
+url <- "https://raw.githubusercontent.com/Codecademy/datasets/master/streeteasy/streeteasy.csv"
+d_raw <- read_csv(url)
+
+# choosing most relevant features
+keep_cols <- 
+  
+   c( "rent",
+     "bedrooms",
+     "bathrooms",
+     "size_sqft",
+     "neighborhood",
+     "building_age_yrs",
+     "borough",
+     "submarket")
+
+df <- d_raw %>% select(one_of(keep_cols))
+df <- rename(df, age = building_age_yrs)
+df <- mutate(df, borough = if_else(neighborhood == "Long Island City", "Queens", borough))
+
+```
+
+
+# Introduction
+
+  The cost of housing in New York City has grown at an unprecedented rate over the past several decades. There are probably both supply-side and demand-side causes to these price increases. On the demand side, some have speculated that there is a superstar-city effect: since the information revolution, the demand for high skilled workers has increased, which has increased the demand for real-estate in dense cities where there are tech companies located. On the supply side, there has been a lot of reluctance both at the neighborhood level and among city officials to promote expansionist housing policies. The result has been prohibitively expensive rent prices and lower labor mobility nationwide. 
+
+  This begs the question: how can we make urban housing more affordable? Solutions usually come in two forms, a market-based approach and an interventionist approach. The market-based approach is usually some variant of easing restrictions and granting tax incentives, an interventionist approach typically involves rent controls and various types of subsidies. An important critique of the market-based approach is that new housing tends to be expensive. While a valid concern, this argument doesn’t consider how long, new market-rate housing stays expensive. I’ll try to answer this question using data from the US Census and the NYC-based real estate platform [Streeteasy](https://streeteasy.com/rentals). 
+
+### My posts will have roughly the following structure:
+
+- Review the literature and assemble a dataset
+
+  - What do economists already know about *filtering* effects in the housing market?
+  - Join Streeteasy and Census datasets
+  - Explore the newly assembled dataset
+  
+- Causal Modelling
+
+  - Use Directed Acyclic Graphs (DAGs) to explicitly state assumptions
+  - Show the shortcomings of my model and which confounders aren't being accounted for
+  
+- Build a statistical model
+
+  - Formally specify a statistical model
+    - discuss using *Generalized Additive Models* and why this is a good application for splines
+  - Specify my (weakly informative) prior information
+  - Fit and interpret the model using samples from the posterior distribution
+  
+- Model assessment
+  
+  - Assess in-sample predicive performance using posterior predicitve checks
+  - Compare the out-of-sample predicive performance of the Splines model and a linear model using leave one out cross validation
+  - Conclude the analysis and discuss next steps
+
+
+
+## Filtering in the housing market
+
+Filtering is an important idea in housing policy, especially when it comes to maintaining a healthy supply of affordable housing. Filtering effects are very intuitive: as the housing stock becomes older, it depreciates, deteriorates, and falls out of fashion. The idea is that new, more expensive housing will *filter* down to become more affordable housing. If there are strong filtering effects in a housing market then, increasing the current supply of higher end housing will probably increase the supply of affordable housing years in the future. 
+
+A breif scan of the economics literature on *filtering effects* surprisingly shows some debate over whether these effects are real.  Coulson and Bond (1990) take a hedonic-regression approach with a linear model and dont find strong evidence of filtering at all[^3]. Rosenthal (2014) constructs and summarizes an impressive panel dataset and finds suggestive graphical evidence that filtering effects are probably non-linear and heterogenous between the rental market and the owner-occupied markets.[^4]  
+
+
+
+
+### The Streeteasy dataset
+
+The real estate platform [Streeteasy](https://streeteasy.com/) released a dataset of 5,000 rental apartments from 2014 on their website which can be accessed on [github](https://raw.githubusercontent.com/Codecademy/datasets/master/streeteasy/streeteasy.csv). The data was published for a [Code Academy](https://www.codecademy.com/articles/streeteasy-dataset) course on multivariate regression techniques, so, a more in-depth description of all of the available features in the dataset is available there.
+
+For this project, the most important variables are:
+
+`rent - price of rent ($)`</br>
+`bedrooms - number of bedrooms`</br>
+`size_sqft - size (ft²)` and </br>
+`neighborhood - neighborhood (ex: Greenpoint)`
+
+What is unique about this dataset is that the neighborhood is highly-granular. This allows me to assess neighborhood effects. For instance in a lot of other housing-unit level datasets, the granularity of the observation on the level of a Metropolitan Statistical Area (ex: New York MSA). This dataset allows me to compare similar units in Brownsville, Brooklyn to those in  Midtown, Manhattan.
+
+#### Sampling
+
+An important drawback of this dataset is not only that it only includes NYC apartments, but it is clearly not a random-sample of NYC apartments. This is evidenced by the fact that the sample doesn't include any units in the Bronx. My hunch is that Streeteasy apartments are fundamnetally different than a randomly selected NYC apartment. Exploring these *selection effects* is beyond the scope of this project but need to be kept in mind throughout.
+
+
+
+```{r plot_fns}
+library(patchwork)
+library(glue)
+
+scale_y_continuous <- function(...){
+  ggplot2::scale_y_continuous(expand = c(0,0))
+}
+segment <- function(...){
+  ggplot2::annotate(...,
+                    geom  = "segment",
+                    size  = 1.2,
+                    alpha = .7,
+                    arrow = arrow(length = unit(3, "mm"), ends = "first"))
+}
+
+geom_vline_t <- function(...){
+  ggplot2::geom_vline(...,
+                      size = 1.2,
+                      alpha = .7)
+}
+```
+
+## The long tail of rentals
+
+New York City is full of contrasts. The high-rise luxury rentals overlooking Park Avenue are just blocks away from the crowded and dilapidated housing projects of Harlem. These contrasts are reflected (to a lesser extent) in the distribution of rental prices in the Streeteasy sample and its long right tail. These distributions are common in economic and social-science data.[^6]
+
+```{r  log_rent, fig.align = "center", fig.height=3, fig.width=10}
+
+theme_set(theme_minimal()+
+            theme(legend.title = element_text(size = 5)))
+
+
+foo <- 
+df %>% 
+  ggplot()+
+  geom_histogram(aes(rent), fill = "grey80", color = "grey20")+
+  theme_minimal()+
+  labs(title = "rent distribution")
+
+bar <- 
+
+df %>% 
+ggplot()+
+  geom_histogram(aes(rent), color = "grey20", fill = "grey80")+
+  scale_x_log10()+
+  labs(title = ("log(rent) distribution"))+
+  theme_minimal()
+
+dsgn <- "
+AAAA#BBBB
+"
+
+foo+bar+plot_layout(design = dsgn)
+
+
+```
+
+
+
+It is said that wealth creates wealth. This is why, according to oxfam the 1% richest people in the world control 44% of the wealth[^2]. This is also why so much economic data follow power law distributions-- or distributions that change in magnitude rather than absolutes. As rent is a function of income (wealthy people rent more expensive apartments) I'd expect rental prices to follow a power law distribution. Ultimately, I want to model the effects of age on rental price with a regression model. A key assumption of regression techniques are that the dependent variable in a linear combination of *additive* independent variables. However, without tranforming my data, my model will take on some functional form:
+
+$$rent_i = e^{\beta_{1}x_{i1} + \beta_{2}x_{i2}...\beta_{k}x_{ik} + \epsilon_i}= e^{\beta_{1}x_{i1}}\times{e^{\beta_{2}x_{i2}}}\times{...}\times{e^{\beta_{k}x_{ik}}}\times\epsilon_i\:\:(i=1,2,...,n)$$
+
+
+where $rent_i$ is the rent for the $i_{th}$ unit and $\beta_j$ is the $j_{th}$ predictor variable.
+
+To fix this all we have to do is take the natural log of both sides of our equations:
+
+$$log(rent_i) = \beta_1x_{i1} + \beta_2x_{i2} + \beta_3x_{i3} + \epsilon_i$$
+
+and voila! our multiplicative model is an additive model. With our dependent variable on the log scale-- we can view the log of rent as the magnitude of rent.[^1] 
+
+
+#### Whats a 1 standard deviation increase in rent?
+
+```{r, include=T, echo=T}
+# create ln(rent)
+df$rent_log <- log(df$rent, base = exp(1))
+
+# standard deviation of log(rent)
+sigma_rent_log <- sd(df$rent_log)
+
+# exponentiate sigma of log rent
+(exp_sigma <- round(exp(sigma_rent_log), 2))
+
+```
+
+So, $e^\sigma=1.67$ which means a standard deviation increase in rent is a 67% inrease in the price of rent. 
+
+
+
+
+
+```{r panel1, fig.align = "center", fig.height=3, fig.width=4, cache =T}
+
+
+age_dens <-
+df %>% 
+  ggplot()+
+  geom_histogram(aes(age), bins = 60, color = "black", fill = "grey80")+
+  geom_vline_t(xintercept = median(df$age))+
+  
+  segment(x = median(df$age)+2,
+           xend = median(df$age)+30,
+           y = 300,
+           yend = 360)+
+  annotate(geom = "text",
+           x = 100,
+           y = 385,
+           label = "Median Age= 44",
+           hjust = .5)+
+  labs(y = "# of Units",
+       x = "Age of building (yrs)",
+       title = str_wrap("Multi-modal distribution of building age", 30))
+dsgn <- "
+AAA#BBB
+"
+
+
+
+
+```
+
+
+### Bucketing units into *High*, *Low* and *Middle* income PUMA's
+
+ 
+
+```{r bucketing, cache=T}
+
+# census income data
+
+library(tidycensus)
+puma_incomes <- 
+  get_acs(geography     = "public use microdata area",
+          variables     = "B07011_001",
+          geometry      = F,
+          survey        = "acs5",
+          state         = "NY",
+          keep_geo_vars = T,
+          year          = 2014,
+          key           = Sys.getenv('CENSUS_KEY'))
+
+# wrangle puma data
+
+puma_incomes <-
+  puma_incomes %>% 
+  janitor::clean_names() %>% 
+  filter(str_detect(name, "Brooklyn|Queens|Manhattan")) %>% 
+  mutate(neighborhood = str_split_fixed(name, "--| PUMA", n = 3)[,2]) %>% 
+  select(-name, -variable)
+
+
+
+
+
+# crosswalk is a file with puma income mapped to the SE neighborhood
+load(file = here("data", "crosswalk.rdata"))
+
+
+
+# actually choosing buckets
+buckets <- c("high-income", "middle-income", "low-income")
+
+crosswalk <- mutate(crosswalk, income_bucket =
+             case_when(
+      med_income <40000 ~ buckets[3],
+      med_income >65000 ~ buckets[1],
+      TRUE              ~ buckets[2]))
+crosswalk <- mutate(crosswalk, income_bucket = factor(income_bucket, levels = buckets))
+
+# join SE data with PUMA income
+df <- inner_join(df, crosswalk)
+
+
+
+# get clipped geographies
+
+library(nycgeo)
+library(sf)
+
+nyc_geog <- nyc_boundaries(
+  geography = "puma",
+  filter_by = "borough",
+  region = c("brooklyn", "queens", "manhattan")
+  )
+
+
+nyc_geog <- inner_join(nyc_geog, select(crosswalk, geoid, income_bucket), by = "geoid")
+
+bucket_labs <- df %>% 
+  count(income_bucket) %>% 
+  mutate(lb = str_c(n, " ", income_bucket))
+
+
+
+
+```
+
+
+As mentioned earlier, this dataset creates a unique opportunity in that is has highly granular neighborhood information. A-priori, neighborhood-level information is clearly relevant to the price of a given rental unit. I mapped *93* Streeteasy Neighborhoods into *39* U.S. Census[^7] *Public Use Microdata Areas*  (PUMA) and then bucketed units into **`r bucket_labs$lb[1]`**, **`r bucket_labs$lb[2]`** and **`r bucket_labs$lb[3]`** `income_buckets`. My approach was to 'eyeball' the distribution of Units by PUMA income and split them as evenly as I could. The key idea here is that the income level of a given neighborhood is correlated with all sorts of variables that cause differences in the price of a rental unit. For instance, low income neighborhoods often have higher crime rates, and, all else equal most people will be willing to pay less money for an apartment in a high-crime neighborhood than for one in a safer neighborhood. 
+
+```{r fig.align="center", out.width="80%", out.height="35%", cache = T}
+library(patchwork)
+library(tidyverse)
+library(viridis)
+library(scales)
+
+pal <- viridis_pal(option = "magma")(16)[c(13, 9, 5)] 
+scale_fill_discrete <- function(...){
+  scale_fill_manual(..., values =pal)
+}
+scale_colour_discrete <- function(...){
+  scale_colour_manual(..., values =pal)
+}
+
+
+  income_chlor <-
+  nyc_geog %>% 
+  ggplot()+
+  geom_sf(aes(fill = income_bucket), color = "grey80", lwd = .1)+
+  annotate(geom = "text",
+           x = Inf,
+           y = Inf,
+           hjust = 1.3,
+           vjust = 2.5,
+           label = "Income Buckets of\nPUMA's")+
+  theme_void()+
+  theme(legend.position = "none")
+
+
+
+bucket_distribution_plot <- 
+  
+df %>% 
+  ggplot()+
+  geom_histogram(aes(med_income, fill = income_bucket), bins = 30, color = "grey70")+
+  
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_continuous(labels = scales::unit_format(scale = 1e-3, unit = "k", prefix = "$"))+
+  
+  labs(subtitle = "Units by PUMA median income",
+       x = "PUMA Median Income",
+       y = "# of Units")+
+  
+  theme(legend.position = c(.25, .7),
+        legend.title = element_blank(),
+        legend.key.height = unit(.15, "cm"),
+        legend.key.width = unit(.25, "cm"))
+
+
+d <- "
+AABBBB
+AABBBB
+##BBBB
+##BBBB
+"
+
+bucket_distribution_plot+income_chlor+plot_layout(design = d)
+
+```
+
+
+### Neighborhoods as mediators for age effects
+
+To further explore the data, I use the geom_smooth[^8] function from the ggplot2 package in R to make conditional-means plots for both unit size and building age on monthly rent. With this approach I basically build 3 models in order to explore the data. Moving from left to right I plot the conditional means of *the linear model*, *Generalized Additive Model* (GAM)[^9] and a *GAM with an Interaction term*. I'll introduce the GAM's further in a later post, but essentially they are regression methods that allow for more flexibility in modelling linear relationships. I think what laregly stands out here is the inadequacy of the linear model. 
+
+```{r out.width="190%", fig.height = 3.5, fig.align="center", cache = T}
+
+
+linear_plot <- 
+ggplot(df, aes(x = age, y = rent))+
+  geom_smooth(formula = y~x)+
+    geom_rug( sides = "b", color = "black", alpha  = .2, size = .3)+
+  labs(title = "Linear model: log(rent)~age",
+       y = "Monthly Rent",
+       x = "Building Age")+
+  scale_y_log10(labels = scales::number_format(scale = 1e-3, suffix = "k", accuracy = 2))+
+  theme(plot.title = element_text(size = 9))
+
+smooth_plot <- 
+  ggplot(df, aes(x = age, y = rent))+
+  geom_smooth()+
+    geom_rug( sides = "b", color = "black", alpha  = .2, size = .3)+
+  labs(title = "Smooths model: log(rent)~age",
+       y = "",
+       x = "Building Age")+
+  scale_y_log10(labels = scales::number_format(scale = 1e-3, suffix = "k", accuracy = 1))+
+  theme(plot.title = element_text(size = 9))
+  
+
+
+age_rent_plt <-
+df %>% 
+  ggplot(aes(age, rent, color = income_bucket, fill = income_bucket))+
+  geom_smooth(key_glyph = draw_key_rect)+
+    geom_rug( sides = "b", color = "black", alpha  = .2, size = .3)+
+  scale_y_log10(labels = scales::number_format(scale = 1e-3, suffix = "k", accuracy = 1))+
+  labs(x = "\nBuilding Age",
+       y = "",
+       title = str_wrap("Smooths model: log(rent)~age", width = 35),
+       subtitle = "by Neighborhood Income")+
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))+
+  theme(plot.title = element_text(size = 9),
+        plot.subtitle = element_text(size = 6.5),
+        legend.position = c(.7,.9),
+        legend.title = element_blank(),
+        legend.key.height = unit(.15, "cm"),
+        legend.key.width = unit(.25, "cm"))
+
+
+# size_rent_plt+age_rent_plt+plot_layout( guides = "collect")
+
+linear_plot+smooth_plot+age_rent_plt
+
+```
+
+
+## Next Steps
+
+I have explored the economics literature on *filtering effect* in the housing market, gathered some data, enhanced this data with U.S. Census Data, and explored the data with by contrasting a *linear approach*, *a non-linear approach* and a *non-linear approach with mediation*. My ultimate goal is to use this data to make causal inferences about the effects of building-age on the price of rent. Therefore, before I build any statistical model's I'll use Directed Acyclic Graphs (DAGs) to explicitly build causal models of this relationship.  
+
+</br>
+
+[Next post: Causal Models](https://tfarley10.github.io/2020/09/27/are-old-apartments-cheaper-building-a-causal-model/)
+
+Heres the [notebook for this post](https://github.com/tfarley10/blog_notebooks/blob/master/2020-09-26-are-old-apartments-cheaper-part-1.Rmd)
+
+
+
+
+
+
+```{r fig.align="center", fig.height=4, include = F, eval = F}
+
+library(ggrepel)
+med_size_tbl <- 
+df %>% 
+  filter(bedrooms == 2) %>% 
+  group_by(income_bucket) %>% 
+  summarise(median_size = median(size_sqft))
+
+size_density_plot <-
+df %>% 
+  filter(bedrooms==2) %>% 
+  ggplot(aes(size_sqft, color = income_bucket))+
+  
+  geom_line( stat = "density", size = 1, alpha=.7, key_glyph = draw_key_path)+
+  
+  geom_vline(data = med_size_tbl, 
+             aes(xintercept = median_size, 
+                 color = income_bucket), 
+             size = 1, 
+             alpha = .7, 
+             linetype = "dotdash",
+             key_glyph = draw_key_blank)+
+  
+  geom_label_repel(data = med_size_tbl, 
+                  aes(x = median_size, 
+                      label = paste0(median_size, " sqft")),
+                  y = c(3.5,2,1), 
+                  force = 3,
+                  box.padding = 3,
+                  key_glyph = draw_key_blank,
+                  size  =2)+
+  labs(title = "Do high income neighborhoods have larger units?",
+       subtitle = str_wrap("Unit size densities for 2 bedroom apartments and median unit size", 35),
+       x = expression("Unit size" ~ (ft^2)))+
+  scale_x_log10(expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  theme(axis.text.y = element_blank(),
+        plot.subtitle = element_text(size = 8),
+        plot.title = element_text(size = 11))+
+  guides(color = guide_legend(override.aes = list(alpha = 1, fill = pal)))
+
+size_density_plot
+
+```
+
+
+
+[Notebook for this post](https://github.com/tfarley10/blog_notebooks/blob/master/2020-09-26-are-old-apartments-cheaper-part-1.Rmd)
+
+
+[^1]:McElreath, Richard. Statistical Rethinking a Bayesian Course with Examples in R and Stan. CRC Press, 2020. 
+
+
+[^2]:https://www.vox.com/future-perfect/2019/1/22/18192774/oxfam-inequality-report-2019-davos-wealth
+
+[^3]: Coulson, N. Edward, and Eric W. Bond. “A Hedonic Approach to Residential Succession.” The Review of Economics and Statistics, vol. 72, no. 3, 1990, p. 433., doi:10.2307/2109351. 
+
+[^4]: Rosenthal, Stuart S. “Are Private Markets and Filtering a Viable Source of Low-Income Housing? Estimates from a ‘Repeat Income’ Model.” American Economic Review, vol. 104, no. 2, 2014, pp. 687–706., doi:10.1257/aer.104.2.687. 
+
+[^6]: *Housing consumption* is a function of wealth. Wealth distributions approximately follow power laws because wealth creates wealth. 
+[^7]: thank you, [{tidycensus}](https://walker-data.com/tidycensus/), a wrapper in R for the Census API
+[^8]: https://ggplot2.tidyverse.org/reference/geom_smooth.html
+[^9]: Simon Wood, [factor smooths](https://astrostatistics.psu.edu/su07/R/library/mgcv/html/gam.models.html)
+
+
+

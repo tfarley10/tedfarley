@@ -1,0 +1,299 @@
+---
+title: Using Alternative data to Assess Borough-level Social-distancing Adherence
+author: ''
+date: '2020-04-18'
+slug: []
+categories: []
+tags: [r, covid]
+---
+
+
+
+## Introduction
+
+In the early spring of 2020,  public health officials realized that a containment strategy for the novel coronavirus was no longer an option and we had to move to one of suppression. A primary feature of the suppression strategy is social distancing. In social distincing, basically people are told to stay home unless they are going to the grocery store. As of this writing, the social distancing strategy has been a resounding success in lowering the replication rate in New York City. In this post I am more interested in variations across time and between boroughs for spring of 2020. 
+
+### The Data 
+The marketing intelligence firm PlaceIQ [published](https://github.com/COVIDExposureIndices/COVIDExposureIndices) two datasets derived from smartphone movement data. The data come in the form of two indices derived by a group of researchers: the Location Exposure Index (LEX) and the Device Exposure Index (DEX). Each has county-level and state-level aggregations for the entire United States. I use this data to satisfy a few curiousities:
+
+  - does device exposure seem like a good measure of how well people are social distancing?
+  
+  - is there variation between boroughs in how and when people are social distincing
+  
+  - are there particular days and days of the week,  when New Yorkers relax their social-distancing efforts
+  
+Its worth mentioning that a direct measure of social distancing efforts doesn't exist, so we have to rely on proxy data like DEX. In summarizing this data, one of my goals is to to improve my understaning of the strengths and constraints of alternative data like DEX. 
+  
+#### What is DEX?
+  
+A sub-component of DEX is an **exposure set**. Consider an example exposure set on an arbitrary day: I went shopping at trader joes in the morning and went to a yankees game in the afternoon, and visited no other venues. If the trader-joe's location that I visited had a total of 7,000 visitors *all-day*  and yankee stadium had a total of 100,000 visitors *all-day* then my exposure set will be 107,000 for last tuesday. DEX is the average of everyone's (in the sample) exposure sets, in a given day.
+
+#### Is this is a good dataset?
+
+DEX relies on cell-phone "pings." If regions differ in their rates of *leaving-your-cellphone-at-home-when-you-go-to-the-grocery-store*, any comparative analysis will be systematically biased. In my opinion, the greatest strength of this dataset is the fact that the county of residence was estimated for each device. So, this is distinctly different from something like foot-traffic data where you measure activity in a particular area. With this data (accounting for sampling, engineering error) we can unambiguously make inferences like "on april second, *people from staten island* had higher average dex scores than *people from brooklyn.* This is especially important in the context of coronavirus where we are trying to variation in the behavior in the residents of a region rather than just outcome-differences in the region itself. 
+
+```{r setup, echo=F}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+```
+
+```{r}
+if(!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse,
+               here,
+               ggplot2,
+               glue)
+```
+
+```{r getdata}
+# read device exposure index
+dex_path <- 
+  url("https://raw.githubusercontent.com/COVIDExposureIndices/COVIDExposureIndices/master/dex_data/county_dex.csv")
+
+
+dex <- 
+  read_csv(dex_path) 
+
+dex <- 
+dex %>% 
+mutate(fips = as.character(county)) %>% 
+  filter(date < as.Date('2020-05-02')) %>% 
+  select(-county)
+
+county_lookup <-
+  tribble(~county, ~fips,
+          "Bronx", "36005",
+          "Brooklyn", "36047",
+          "Manhattan", "36061",
+          "Queens", "36081",
+          "Staten Island", "36085"
+          )
+
+
+```
+
+
+```{r plot1, fig.height = 4}
+#### make time-series plot for dex nyc  #####
+
+
+lockdown_date <- as.Date("2020-03-20")
+state_emer <- as.Date("2020-03-07")
+
+dex2 <- inner_join(dex, county_lookup, by = "fips")
+
+# make labels for sec_axis
+dex_lab <- 
+  dex2 %>% 
+  group_by(county) %>% 
+  filter(date == max(date))
+  
+# plot
+
+plot1 <- 
+dex2 %>% 
+  ggplot()+
+  geom_line(aes(y = dex_a, x = date, color = county), 
+            lwd = 1, alpha = .75)+
+  geom_vline(xintercept = lockdown_date, linetype = "dotdash" )+
+  annotate(geom = "text", 
+           label = "City-wide\nlockdown starts",
+           x = lockdown_date+2, y = 1000, 
+           hjust = 0)+
+  scale_color_brewer(type = "qual", palette = "Dark2")+
+  labs(title = "Device Exposure Index in NYC",
+       caption = "Data: PlaceIQ")+
+  theme_minimal()+
+  theme(legend.position = "top",
+        legend.title = element_blank()) 
+
+plot1
+```
+
+
+```{r  fig.align='center', eval=F}
+dex2 <-
+  dex2 %>% 
+    mutate(timeline = 
+      factor(case_when(
+        date < state_emer ~ "Pre-S.O.E.",
+        date >= state_emer ~ "Post S.O.E."
+        
+      ), levels = c("Pre-S.O.E.", "Post S.O.E.")
+    ),
+    soe = date >= state_emer)
+
+ann_text <- 
+  tribble(~date, ~dex_a, ~timeline,
+  lockdown_date, 600,  factor("Post S.O.E.", levels = c("Pre-S.O.E.", "Post S.O.E.")))
+
+dex2 %>% 
+  filter(soe & date < as.Date('2020-03-25')) %>% 
+  ggplot()+
+  geom_line(aes(y = dex_a, x = date, color = county), 
+            lwd = 1, alpha = .75)+
+  
+  geom_vline(data = ann_text, aes(xintercept = date), linetype = "dotdash" )+
+  geom_text(data = ann_text,aes(x = date-5, y = dex_a), label = "Official\nlockdown starts", hjust = 0, size = 3)+
+  
+  scale_color_brewer(type = "qual", palette = "Dark2")+
+  labs(title = "Device Exposure Index in NYC",
+       caption = "Data: PlaceIQ")+
+  theme_minimal()+
+  coord_fixed(1/50)+
+  theme(legend.position = "top",
+        legend.title = element_blank())
+
+```
+
+
+### Post-lockdown subset
+
+The raw data here show that, post-lockdown, Staten Island consistently has the highest exposure rates, followed by Queens and then there don't seem to be large differences between Manhattan, Brooklyn or the Bronx.
+```{r fig.height=4}
+library(tsibble)
+library(feasts)
+
+# make a time-series object
+dex_ts <- 
+dex2 %>% 
+  as_tsibble(index = date, key = county)
+
+# decompose time series into components
+dex_decomposition <- 
+dex_ts %>% 
+  filter(date>lockdown_date+5) %>% 
+  model(STL(dex_a ~season(window = Inf))) %>% 
+  components()
+dcmp_tbl <-
+dex_decomposition %>% 
+  as_tibble() %>% 
+  mutate(dow = lubridate::wday(date, label = T, abbr = F))
+
+dex_ts %>% 
+  filter(date>lockdown_date+5) %>% 
+  ggplot(aes(x = date, y = dex_a, group = county, color = county))+
+  geom_line(alpha = .7, lwd = 1)+
+  scale_color_brewer(type = "qual", palette = "Dark2")+
+  labs(title = "Device exposure, post lockdown",
+       subtitle = "March 25 - May 2",
+       y = "DEX",
+       x = "")+
+  theme_minimal()+
+  theme(legend.position = "top",
+        legend.title = element_blank())
+
+```
+
+
+## Decomposition
+
+In this decomposition, there are 3 primary components:
+
+#### Seasonal Component
+- in this data the seasonality is a day-of-the-week effect. We could expect that there are certain days of the week that people will be 'going-out' more. The seasonal effect of this data *can* be an indicator of what is really putting people at risk of infection. In this sample, we see that Staten Islander's are much more saturday-prone than the other boroughs. 
+
+```{r season}
+# plot for week effects
+dcmp_tbl %>% 
+  group_by(county, dow) %>% 
+  summarise(sw = mean(season_week)) %>% 
+  ggplot(aes(dow, sw, group = county, color = county))+
+  geom_point()+
+  geom_line( alpha = .6, lwd = 1)+
+  labs(title = "Borough-level day of week effects",
+       subtitle = "device exposure index",
+       x = "",
+       y = "seasonal effects",
+       caption = "Data: PlaceIQ")+
+  scale_color_brewer(type = "qual", palette = "Dark2")+
+  theme_minimal()
+```
+
+#### Persistent trends
+
+- the **trend component** represents a persistent directionality of the data. Without easter[^1], I think we would see  more of a U-shaped trend curve here. 
+
+
+
+[^1]: with a longer time-series I think easter would have shown up more in the residuals
+
+```{r decomp}
+dcmp_tbl %>% 
+  ggplot(aes(x = date, y = trend, group = county, color = county))+
+  geom_line( alpha = .6, lwd = 1)+
+  labs(title = "Borough-level trends",
+       subtitle = "device exposure index",
+       x = "",
+       y = "DEX trend",
+       caption = "Data: PlaceIQ")+
+  scale_color_brewer(type = "qual", palette = "Dark2")+
+  theme_minimal()+
+  coord_fixed(.75)+
+  theme(legend.title = element_blank(),
+        legend.position = "top")
+```
+
+
+
+
+#### Residuals
+
+ - The residuals are the 'leftover' variation in the data that weren't captured by either the trend component or the seasonal component. Here, I use the residuals to identify 'special' days in which people may relax their social-distancing behaviors. Unsurprisingly, good weather seems to positively effect device exposure. However, this increase may very well be highlighting a limitation of this data. For instance it may be true that when small groups of people gather in a public park the transmission risk is relatively low, however, everyone's device exposure is really high. Therefore, its good to be cognizant that this data is a proxy for social distance adherence and has its limitations. 
+
+```{r easter, fig.width=8, dpi = 200, out.height="50%"}
+
+library(ggrepel)
+easter <- as.Date('2020-04-12')
+
+labels <- 
+dcmp_tbl %>% 
+  filter(date<as.Date('2020-05-02')) %>% 
+    arrange(desc(remainder)) %>% 
+    select(county, remainder, date) %>% slice(1:3) %>% 
+    mutate(label = c("sunny\nsaturday\nweather", "easter\nsunday",  "blue\nangels\nflyover"))
+
+
+
+
+dcmp_tbl %>% 
+  select(date, county,remainder) %>% 
+  filter(date<as.Date('2020-05-02')) %>% 
+  ggplot(aes(x = date, y = remainder, group = county, color = county))+
+  geom_line( alpha = .5, lwd = 1)+
+  geom_text_repel(data = labels, 
+                     aes(label = label, x = date, y = remainder), 
+                     arrow = arrow(length = unit(0.03, "npc"), 
+                                   type = "closed", 
+                                   ends = "last"),
+                     box.padding = 1,
+                     point.padding = 1.5,
+                    direction = "x",
+                     segment.color = "grey20",
+                     color = "grey20",
+                  size = 3,
+                  fontface = "bold",
+                  lineheight = .8,
+                  min.segment.length = .3)+
+  labs(title = "",
+       x = "",
+       y = "DEX",
+       caption = "Data: PlaceIQ")+
+  scale_color_brewer(type = "qual", palette = "Dark2")+
+  scale_x_date(expand = c(0,1))+ 
+  coord_fixed(1/4)+
+  theme_minimal()+
+  theme(legend.position = "top",
+        legend.title = element_blank())
+
+
+
+```
+
+
+
+
+## Summary
+
+In my opinion, a logical next step with this data would be to use it (or a similar dataset) to model the association between device exposure and covid-19 case growth rate. For example, this data seems to show that sunny weekend weather exogenously affects people's social-distancing behavior. If this is the case one could treat this as a natural experiment. To test this, there would need to be a well understood time between exposure (the sunny day) and symptoms. As the incubation rate (and there is likely a distribution of incubation rates) is not really well understood, its best to heed caution before doing such an analysis. This is a very interesting dataset and I hope to come back to it in a future post. 
+
+
