@@ -1,0 +1,98 @@
+---
+title: Are old apartments cheaper?...Building a causal model
+author: ''
+date: '2020-09-27'
+slug: []
+categories: []
+tags: [housing, causal models]
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+```
+
+
+## Introduction
+
+In the [previous post](https://tfarley10.github.io/2020/09/26/are-old-apartments-cheaper-part-1/) I introduced my quesntion of interest: *Is there evidence of filtering effects in the NYC housing market?*, performed a breif review of the literature on the topic and did some data exploration. Importantly, in my exploration of the data I use 4 out of the 20 possible features in the dataset. If this were a prediction problem, that would not be wise as I would be throwing information away that could improve the performance of my model. 
+
+The ultimate aim of this analysis is to predict the effects of future interventions.[^2] In this analysis the ideal questions would be: *If we magically made an apartment older what would happen to its monthly rental price?* 
+
+$$E[rent|do(age)]$$
+
+While this type of itervention is abstract and impossible, we can use regression analysis to identify the effects of  $do(age)$ interventions. In this post, I'll use Directed Acyclic Graphs to attempt to assess whether these causal effects are identifiable with regression analysis. 
+
+## Some confounders
+
+Unfortunately, with observational data there are many challenges to overcome when trying to identify causal effects. Posiibly the most well known is the *confounding variable bias.* The confounding variable bias occurs when your outcome of interest and your predictor of interest are conditional on some other variable. In this analysis we technically have 2 predictor variables of interest: Neighborhood income and building age. Now consider that a lower income family  looking for a 2 bedroom apartment has preferences for smaller apartments because they are less expensive (they probably do). Without conditioning on unit size, we will bias our estimates of Neighborhood on the price of a rental unit. 
+
+```{r size_dag, out.width="50%", fig.align='center', echo=F}
+
+library(ggdag)
+title = "DAG #1: unit size as a confounder"
+dagify(size  ~ ni,
+       price ~ ni + size,
+       labels = c(
+         size = "Unit size",
+         price = "Price",
+         ni = "Neighborhood Income"
+       )) %>% 
+  ggdag(use_labels = "label", node_size = 9, text = F)+
+  theme_dag()+
+  labs(title = title)
+
+
+```
+
+Here, the path $Neighborhood\rightarrow Size\rightarrow Price$ creates a spurious relationship between Neighborhood effects and unit price, this is known as a *back door path*. However, all we need to do is condition on unit size in a regression model to *shut* this back door path. 
+
+An important confounder in this data are the selection effects of units that have some unobserved amenities. This *back-door path* shows up in $Age\leftarrow Amenities\rightarrow Price$. The intuition behind this *back-door path* is that there are particular 'charms' about a particular unit. That make it more desireable to live in. The 'charms' cause building age $Amenities \rightarrow Age$ because the most 'charming' units are the least likely to torn down and replaced. Unfortunately, these features are very hard to condition on.  These selection effects are likely to dampen filtering effects as the older the housing stock is, the more likely it is to have idiosyncratic, unobserved amenities. 
+We aslo have to consider the possibility that there are *cohort-effects* in  the housing stock that are correlated with the price of a unit. This shows up in DAG #2 as the path $Age \leftarrow Year\, Built \rightarrow Price$. Consider the possibility that there was a particular decade in which there were tax incentives to build relatively more luxury housing. Or there is some historical significance of building from some decade. These would both be correlated with aga and price and represent another *back-door path* for unit age to rental price. 
+```{r age_dag, out.width="50%", fig.align='center', echo=F}
+
+title <- "DAG #2: Age has two confounders"
+
+dagify(price ~ year + amenity + age,
+       age  ~ year + amenity,
+       labels = c(
+         "price" = "Price",
+         "age" = "Unit Age",
+         "year" = "Year\nBuilt",
+         "amenity" = "Unobserved\nAmenities"
+       )) %>% 
+  ggdag(use_labels = "label", node_size = 9, text = F)+
+  theme_dag()+
+  labs(title = title)
+```
+
+
+
+
+#### What not to include?
+
+I've gone over some issues with *omitted variable bias* and discussed how omitted variables can create spurious correlations in trying to identify causal effects. The Streeteasy dataset provided 20 variables: in order to avoid these spurious correlations, why would I not just include all of the information available? 
+
+I did this because *included variable bias* is just as big of a problem in causal inference as omitted variable bias.[^3] Thomas Beir of the Brookings institution describes the filtering process as when a building ages there is a sort of a deterioration process[^4] that causes the price to decrease: $Age\rightarrow Deterioration\rightarrow Price$.
+Consider if there was some index of unit deterioration in the dataset that measured how creaky the floorboards are, how much the pain is chipping on the exterior of the building, etc. If we condition on this variable we will bias our identification of filtering effects. This is *because* deterioration is so relevant to filtering that it shouldnt be included. 
+
+
+
+## Conclusion
+
+I have introduced several potential biases in identifying filtering effects, presenting a way around one of them while the others are for now, limitations in my causal identification strategy. I use Directed Acyclic Graphs to be explicit about the assumptions about my identification approach. Using DAG's for causal modelling has two main features:
+
+- they can help identify what you can condition on in order to close a back-door path and 
+
+- they force you to justify every variable in your model to avoid shutting an already open path.
+
+Importantly, using DAGs for this analysis has shed more light on the limitations in the dataset as I've identified two biaes that I can't find a back-door path to solve: the cohort effects, and selection effects. With these issues unresolved, I'll continue with the analysis keeping in mind that statisticasl inference needs to be taken with a grain-of-salt. In my next post, i'll use information from my causal models to justify and build a statistical model of filtering.
+
+[Next Post: Building a Statistical Model](https://tfarley10.github.io/2020/10/03/are-old-apartments-cheaper-part-3/)
+
+
+
+
+
+[^1]:[Johns Hopkins and Furman Center look at differential investment by landlords](https://www.urban.org/sites/default/files/publication/24251/412967-Maintenance-and-Investment-in-Small-Rental-Properties-Findings-from-New-York-City-and-Baltimore.PDF)
+[^2]: Pearl, Judea, et al. Causal Inference in Statistics: a Primer. Wiley, 2016. 
+[^3]: McElreath, Richard. Statistical Rethinking a Bayesian Course with Examples in R and Stan. CRC Press, 2020.
+[^4]: https://www.brookings.edu/research/moving-up-filtering-down-metropolitan-housing-dynamics-and-public-policy/

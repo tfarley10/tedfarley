@@ -1,0 +1,39 @@
+---
+title: 'dbt Pluto: First Post'
+author: ''
+date: '2021-07-24'
+slug: []
+categories: []
+tags: []
+---
+<style type="text/css">
+.main-container {
+  max-width: 3000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r setup, echo=F}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{sql eval = F}
+{% set pluto_tables = get_pluto_tables() %}
+{% set max_far = ["residfar", "maxallwfar"] %}
+
+{% for tb in pluto_tables %}
+select 
+    ...
+    {{across(one_of(max_far, source('pluto', tb )), "{{var}}")}} as max_far,
+    {{across(starts_with('landuse', source('pluto', tb)),"{{var}}")}} as land_use,
+    safe.st_geogfromtext(wkt_geom) as geom
+from {{source('pluto', tb )}}
+{% if not loop.last -%} union all {%- endif %}
+{% endfor %}
+```
+

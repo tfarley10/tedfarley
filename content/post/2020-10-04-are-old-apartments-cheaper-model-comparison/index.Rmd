@@ -1,0 +1,247 @@
+---
+title: Are old apartments cheaper?...Model Comparison
+author: ''
+date: '2020-10-04'
+slug: []
+categories: []
+tags: [housing, model comparison, cross-validation]
+bibliography: ["bib/ste4.bib"]
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+
+```{r}
+library(tidyverse) # wrangling & graphics         
+library(gt)        # html tables   
+library(here)      # environment     
+library(brms)      # STAN wrapper     
+library(tidybayes) # extracting draws  
+library(patchwork) # combine seperate plots, 
+library(ggridges)  # ridgeline plots
+```
+
+# Intro 
+
+In the last post, after specifying a statistical model for the the effects of age on rent in the Streeteasy dataset, I fit that model and graphically compared it to a linear model. I pointed out that one advantage of the splines model is that it allowed me to identify in a more granular way how cohort effects could bias my inference. While the overally goal of this analysis is to infer the *causal effects* of age on rental price a sub-goal of this process is to build a model that describes the underlying data-generating process well.
+
+## PP check to assess calibration
+
+While a major goal of my previous post was to summaraze the causal effects of age on rental price, here I try to summarize the entire model. @rethinking points out that this is not an easy task, and I could take any number of apporaches here. To start-- I'll use the {bayesplot} package developed by @bayesplot to perform posterior predictive checks. This approach involves plotting samples from the posterior prediciton of my model against the raw data. In the plot below I compare my the *calibration* of my splines model to that of the linear model. The two show little difference and, in general no reason for concern. One thing that could be interesting is to look at is why there isn't very good coverage for on the right tail of of the distribution of rent prices. The way I read this is that my model doesn't do a very good job of predicting which units will be the most expensive. This type of a question wasn't a part of this analysis so I'll save it for a rainy day. 
+
+
+
+```{r pp_check, fig.align="center", fig.width=8, fig.height=3, cache=T, eval=T}
+
+smooth_model <- readRDS(here("data", "smooth_model.Rds"))
+linear_model <- readRDS(here("data", "linear_model.Rds"))
+
+n <- 100
+
+bayesplot::color_scheme_set("red")
+
+
+pp_smooth <- bayesplot::pp_check(smooth_model, nsamples = n)
+pp_linear <- bayesplot::pp_check(linear_model, nsamples = n)
+
+pp_smooths_plt <- 
+pp_smooth+
+  labs(title = "Splines model")+
+  scale_x_continuous(limits = c(-4, 4))+
+  theme(legend.position = "none")
+
+pp_linear_plt <-
+  pp_linear+
+  labs(title = "Linear model")+
+  scale_x_continuous(limits = c(-4, 4))
+
+
+title <-  "Posterior Predictive checks"
+
+pp_smooths_plt+pp_linear_plt+plot_annotation(title = title)
+
+
+
+```
+
+
+
+
+## Using Cross Validation to assess Model Performance
+
+While the posterior predictive checks are a good first step in checking model performance, they are by no means sufficient. For example, a grossly overfit model will perform very well in posterior predictive checks. While I dont have a good metric for assesing the *objective* out of sample performance, I can use a cross-validation approach to compare the out of sample performance with the performance of my splines model. 
+
+### posterior predictive density
+
+@rethinking shows that the log-pointwise-predictive-score is 'the gold standard' in model comparison techniques.  The lppd for dataset $y$ and model $\Theta$ looks like:
+
+
+$$lppd(y, \Theta) = \sum_{i=1}\frac{1}{S}\sum^{S}_{s=1}logPr(y_i|\Theta_s)$$
+
+basically, this will average the probability of observation $y_i$ over the posterior distribution $\Theta_s$. 
+
+However, in order to get a good measure of *out-of sample perfromance* we'll need to incorporate cross validation. While there are many different ways to apply cross validation, here I use a variant of leave-one-out cross-validation (LOO-CV). LOO-CV is exactly as it sounds: in a dataset with $n$ observations, you fit $n$ models, always leaving one observation out and scoring the model's performance on the 'left-out' observation. Notationally this looks like:  
+
+
+$$lppd_{cv} = \sum^{N}_{i=1}\frac{1}{S}\sum^{S}_{s=1}logPr(y_i|\Theta_{-i,s})$$
+
+its the same thing as above, except the $logPr(y_i|\Theta_{-i, s})$ is the log probability of the observation $y_i$ conditional on $\Theta_{-i,s}$ the model that is fit without observation $y_i$. 
+
+</br>
+
+
+#### Using {loo} to calculate the expected log predictive density
+
+</br>
+
+While this is the gold standard of model comparison in theory, in practice this would require us to fit $n$ models, which would take weeks. @loo provides algorithmic shortcuts to estimate LOO-CV LPPD, called Pareto Smooth Importance Sampling (PSIS). This is really a lot of acronyms for one model comparison, but the gist of importance sampling, is to estimate the whole differences in lppd between two models by first looking points that are *important* for the posterior distribution-- points that, if they weren't there the posterior would look different. So there we have it we will use pareto smooth-importance-sampling and leave-one-out cross-validation to estimate the differences in the log-pointwise-predictive-density of the linear model versus the splines model.  
+
+</br> 
+
+```{r loo_table, cache = T, eval=T}
+
+
+smooth_mod <- brms::add_criterion(smooth_model, "loo")
+linear_mod <- brms::add_criterion(linear_model, "loo")
+
+models <- c("Smooth model", "Linear model")
+title <- "ELPD comparison of models"
+
+elpd <- "Differences in estimated log predictive density"
+
+
+loo_table <-
+brms::loo_compare(linear_mod, smooth_mod) %>% 
+  as_tibble() %>% 
+  select(1:2) %>% 
+  mutate(models = models,
+         across(1:2, as.numeric)) %>% 
+  select(models, everything())
+
+se_difference <- round(abs(loo_table$elpd_diff[2]/loo_table$se_diff[2]), 2)
+difference_label <- glue::glue("{se_difference} times greater\nthan the standard error of the differences")
+
+
+loo_table %>% 
+  gt(rowname_col = "models") %>% 
+  fmt_number(columns = vars(elpd_diff, se_diff), decimals = 1) %>% 
+  tab_header(title = title) %>% 
+  tab_footnote(
+    footnote = difference_label,
+    locations = cells_body(
+      columns = vars(elpd_diff),
+      rows = 2)
+    )
+  
+  
+
+```
+
+
+</br>  
+
+
+The table above shows that the differnces in expected log predictive density between the two models is large and favors the splines model. This is validating, and is a strong suggestion that the splines approach is at least a superior specification to the linear model on this data. Its important to keep in mind that these values are just estimates and while they provide some evidence that the splines model has the correct specification, the evidence needs to be taken with a grain of salt. 
+
+# Conclusion
+
+In this post I use the posterior distributions of the linear model and the splines model to perform a graphical check of how well each is calibrated to the data. While I do see some room to improve my specification, the calibration wasn't overly concerning. Then with the help of the {[loo](https://mc-stan.org/loo/index.html)} package I uses (pareto smooth) importance sampling to estimate log-pointwide-predicive-density of each model and find evidence that the smooth model is a better specification. 
+
+
+
+</br>
+
+ 
+</br>
+
+```{r predict_35, cache = T, eval = F}
+
+len <- 50
+years <- c(0, 50)
+lv <- c("low-income", "middle-income", "high-income")
+
+load(file = "ste.rdata")
+
+mean_size_log  <- mean(ste$size_log)
+sd_size_log   <- sd(ste$size_log)
+mean_rent_log <- mean(ste$rent_log)
+sd_rent_log  <- sd(ste$rent_log)
+
+new_data <- 
+  smooth_model$data %>% 
+  modelr::data_grid(
+    bedrooms         = rep(2, len*3), # 2br apartment
+    size_lc          = rep(0.59, len*3), # median size 2br
+    age              = rep(years, (len*3)/length(years)), # repeat 0, 35
+    income_bucket    = rep(factor(1:3, labels = lv), len) # for every income level
+  )
+
+
+predictions_35 <- 
+  tidybayes::add_predicted_draws(newdata = new_data, 
+                      model   = smooth_mod, 
+                      n       = 2e3) %>% 
+  mutate(rent = exp((.prediction*sd_rent_log)+mean_rent_log))
+
+
+predict_difference <- 
+  predictions_35 %>% 
+  arrange(desc(income_bucket, age)) %>% 
+  # make comparisons with draw from posterior
+  group_by(.draw, income_bucket) %>% 
+  # difference in predicted price after 35 years
+  mutate(rent_diff = rent-lag(rent)) %>% 
+  
+  filter(!is.na(rent_diff)) %>%
+  mutate(total_diff = cumsum(rent_diff))
+```
+
+
+```{r plot_35, fig.align="center", fig.height=5, fig.width=7, cache=T, eval=F}
+
+
+theme_set(
+  theme_minimal()+
+  theme(panel.grid.minor = element_blank(),
+        legend.position  = "top",
+        axis.text.y      = element_blank(),
+        legend.title     = element_blank())
+)
+
+title <- "How do we expect apartment price to change when age goes from 0 to 35?"
+subtitle <- expr(list("2 bedroom unit", "size=1,050 ft"^2))
+x_lab <- "\nE[rent | age = 35), ...] - E[rent | age = 0), ...]"
+x_breaks <- seq(-7000, 7000, 1000)
+x_limits <- c(-7000, 7000)
+plt_arrow <- arrow(length = unit(2, "mm"), ends = "first")
+
+pal <- viridis::viridis_pal(option = "magma")(16)[c(13, 9, 5)] 
+
+scale_colour_discrete <- function(...){
+  scale_colour_manual(..., values =pal)
+}
+
+scale_fill_discrete <- function(...){
+  scale_fill_manual(..., values =pal)
+}
+
+library(ggridges)
+m <- 
+  predict_difference %>% 
+  group_by(income_bucket) %>% 
+  summarise(med = median(total_diff))
+
+ggplot(predict_difference, aes(x = total_diff, y = income_bucket, color = income_bucket) ) + 
+  geom_density_ridges(scale =2, size = 1.5, alpha = 0.3, rel_min_height = .0005, quantile_lines = T, quantiles = 2)+
+  scale_x_continuous(limits = x_limits, breaks = c(-4000, -2000, 0, 2000, 4000))+
+  scale_y_discrete(expand = expand_scale(add = c(0.2, 1.5)))
+
+
+```
+
+
