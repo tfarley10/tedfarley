@@ -17,6 +17,16 @@ tags: [dbt-pluto]
   margin-right: auto;
 }
 </style>
+<pre class="r"><code>library(here)
+print(here())</code></pre>
+<pre><code>## [1] &quot;/Users/edwardfarley/Desktop/tedfarley&quot;</code></pre>
+<pre class="r"><code>fs::dir_tree(recurse = 1)</code></pre>
+<pre><code>## .
+## ├── index.Rmd
+## ├── index.Rmd.lock~
+## ├── index.html
+## └── index_files
+##     └── header-attrs</code></pre>
 <pre class="sql"><code>{% set pluto_tables = get_pluto_tables() %}
 {% set max_far = [&quot;residfar&quot;, &quot;maxallwfar&quot;] %}
 
