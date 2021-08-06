@@ -1,0 +1,387 @@
+---
+title: Are old apartments cheaper?...Building a statistical model!
+author: ''
+date: '2020-10-01'
+slug: []
+categories: []
+tags: [housing, regression]
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, eval = F)
+```
+
+
+
+</br>
+
+
+```{r package_check, eval = T, echo = F}
+nec_packages <- 
+  c(
+    "tidyverse", # wrangling, graphics        
+    "gt",        # html tables 
+    "here",      # environment   
+    "brms",      # STAN wrapper   
+    "tidybayes", # extracting draws
+    "patchwork", # combine seperate plots,
+    "ggridges"   # ridgeline plots
+    )
+
+# https://stackoverflow.com/questions/4090169/elegant-way-to-check-for-missing-packages-and-install-them
+new_packages <- nec_packages[!(nec_packages %in% installed.packages()[,"Package"])]
+if(length(new_packages)) install.packages(new.packages)
+
+library(tidyverse) # wrangling, graphics         
+library(gt)        # html tables   
+library(here)      # environment     
+library(brms)      # STAN wrapper     
+library(tidybayes) # extracting draws  
+library(patchwork) # combine seperate plots, 
+library(ggridges)  # ridgeline plots
+
+
+```
+
+
+
+## Introduction
+
+In [part 1](https://tfarley10.github.io/2020/09/26/are-old-apartments-cheaper-part-1/) while exploring the dataset I stated two a priori beliefs about the relationship between building age and rental price. First, especially when taking selection bias, this relationship is unlikely to be linear (or log-linear in this case). Second, I suggested that the relationship was likely to be different in different types of neighborhoods. In this post, I’ll start by specifying a statistical model that addresses the mediating effects of ‘Neighborhood Income level’, non-linearities, and confounding variable bias. I’ll fit this model and then interpret it using conditional effects plots derived from the posterior distribution. 
+
+
+### Specifying my statistical model
+
+The first challenge in building this model is to address non-linearities in the relationship between age and rental price. Splines offer a good solution for modeling non-linear effects. One common approach to modeling non-linearities like this is to use polynomial regression. However, polynomial regression can only model non-monotonic relationships-- relationships in which the slope is always changing. This constraint of polynomial models can yield [outrageous predictions](https://twitter.com/WhiteHouseCEA/status/1257680258364555264) and [invalid hypothesis tests](https://statmodeling.stat.columbia.edu/2019/06/30/what-if-the-authors-of-that-regression-discontinuity-paper-had-only-reported-their-local-linear-model-results-with-no-graph/)[^rethinking]. Splines are a great tool and there are a ton of great resources out there for applying them in R!
+
+
+
+
+### More formally my statistical model looks like this:
+
+</br>
+
+$R_i$, the monthly rental price for unit $i$, is log-normally distributed conditional on $\mu_i$, the mean for unit $i$ and the variance $\sigma$.
+
+
+\begin{align*}
+R_i   \sim & LogNormal(\mu_i, \sigma^2) \\
+\mu_i    = & \alpha_{BID[i]} + \sum^{J}_{j=1}w_jF_{j,BID[i]} + \beta_{size}Size_i + \beta_{bedrooms}Bedrooms_i
+\end{align*}
+
+
+$\alpha_{BID[i]}$ is the partially pooled intercept for the 3 income buckets.
+
+
+
+#### The splines part of the model
+
+Splines fit non-linear relationships by using sets of synthetic functions, basis functions, assigning weights to each function and then adding them all up. These additive combinations forms forms wiggly relationships from linear functions. The $\sum^{J}_{j=1}w_jF_{j,BID[i]}$ term in my linear model illustrates this process. Where the $jth$ basis function $F_j$ is multiplied by the associated weight $w_j$, and then all $j$ functions are added up for every observation $i$.   The key to splines is that all of the basis functions are linear, but, when you add them together, they don't look linear. 
+
+
+#### Weakly informative priors
+
+\begin{align*}
+\beta_{size}, \beta_{bedrooms}  \sim & Normal(0,1) \\
+\alpha_{BID[i]} \sim & Normal(\gamma, \tau) \\
+\gamma \sim & Normal(0,1.5) \\
+\tau  \sim & Exponential(1) \\
+\lambda   \sim & StudentT(3,0,10) \\
+\end{align*}
+
+
+
+$\beta_{size}$ and $\beta_{bedrooms}$ are the parameters for the slope coefficients that have been centered at zero and scaled to have standard deviation = 1.  $\alpha_{BID[i]}$, the partially-pooled parameter for the income bucket intercepts and has two hyper-priors: $\gamma$ the parameter for the population intercept and $\tau$ the scale parameter for varying intercepts. Finally, $\lambda$ is the scale parameter for the spline term which essentially learn's how 'wiggly' the relationship is (I cant really figure out how to incorporate this into my statistical model).
+
+- R code for model specification
+
+```{r smooth_specs, echo=TRUE, eval=T}
+
+# create brms formula
+smooth_form <- 
+  brms::bf( 
+           rent_lc ~ 1 + 
+             s(age, by = income_bucket, bs = "fs") + 
+                 bedrooms + size_lc + (1|income_bucket) 
+    )
+```
+
+- R code {brms} for my priors
+
+```{r priors, eval=T, echo=T}
+
+# priors for smooth model
+priors_smooth <- c(  # ß_bedroom, ß_size
+                     prior(normal(0, 1.5),       class = b),
+                     # population intercept
+                     prior(normal(0,1.5),        class = Intercept),
+                     # population variance, gamma
+                     prior(exponential(1),       class = sigma),
+                     # fixed effects variance, tau
+                     prior(exponential(1),       class = sd),
+                     # wiggliness of the smooths
+                     prior(student_t(3, 0, 2.5), class = sds))
+
+```
+
+
+```{r read_data, echo=F, eval = T, cache=T}
+# url for data
+url <- str_c("https://raw.githubusercontent.com/",
+          "Codecademy/datasets/master/streeteasy/streeteasy.csv")
+raw_data <- read_csv(url)
+
+# found a mistake
+ste <- mutate(raw_data, 
+              borough = if_else(neighborhood == 
+                                  "Long Island City", "Queens", borough))
+
+# too much typing
+ste <- rename(raw_data, age = building_age_yrs)
+
+# sparse after 150, makes the fits cleaner
+ste <- filter(ste, age < 151)
+```
+
+
+### Actually fitting the model
+
+At this point I have read in the Streeteasy dataset (`ste`) from [the Codeacademy github repo](https://raw.githubusercontent.com/Codecademy/datasets/master/streeteasy/streeteasy.csv). I'll log-transform the `rent` to meet the additivity assumption for linear regression models. I also log-transform `size` independent variable for the square footage of an apartment.
+
+```{r pre_process, echo=F, eval = T, cache =T}
+# rent is appr lognormal
+ste$rent_log <- log(ste$rent)
+
+# for scaling
+mean_rent_log <- mean(ste$rent_log)
+sd_rent_log  <- sd(ste$rent_log)
+
+# size is appr lognormal
+ste$size_log <- log(ste$size_sqft)
+
+# for scaling
+mean_size_log  <- mean(ste$size_log)
+sd_size_log   <- sd(ste$size_log)
+
+
+# df to be passed into brms::brm()
+ste <- 
+ste %>% 
+  mutate(rent_lc = (rent_log-mean_rent_log)/sd_rent_log,
+         size_lc = (size_log-mean_size_log)/sd_size_log)
+```
+
+
+```{r read_crosswalk, echo=F, eval = T, cache=T}
+
+# loads the crosswalk for income buckets defined in part 1
+load(file = "crosswalk.rdata")
+ste <- inner_join(ste, select(crosswalk, c(neighborhood, income_bucket)))
+
+```
+
+
+```{r drop_cols, echo=F}
+
+# choosing most relevant features
+keep_cols <- 
+  
+   c( "rent",
+     "bedrooms",
+     "bathrooms",
+     "size_sqft",
+     "neighborhood",
+     "age",
+     "borough",
+     "submarket",
+     "rent_lc",
+     "size_lc",
+     "income_bucket")
+
+# streeteasy data
+ste <- ste %>% select(one_of(keep_cols))
+
+
+```
+
+
+To fit the model, I use the {brms[^brms]} package in R. {brms} is essentially a warpper function for the probabilistic-programming language Stan[^stan]. Stan is (I'm told) the latest-and-greatest in Markov chain Monte Carlo (MCMC) methods for sampling from a posterior distribution. Stan is well known for it's implementation of a particularly efficient algorithm called the No U-turn sampler (NUTS). While getting into the weeds of probabilistic programming is outside the scope of this project (and above my pay grade), essentially NUTS uses clever tricks to avoid 'getting stuck' in certain areas of the posterior distribution.[^mcelreath_blog] I show the code for specifying my model in {brms}, combined with the formula and priors set above, the model is ready to be fit. 
+
+
+#### {brms} code for fitting my model
+
+```{r fit, eval =T, echo=T}
+set.seed(1020)
+# fit the smooth model
+smooth_mod <- 
+  brms::brm(
+             formula = smooth_form,
+             data    = ste,
+             warmup  = 1000,
+             iter    = 3000,
+             prior   = priors_smooth,
+             # this saves .rds object
+             file    = "smooth_model",
+             chains  = 4,
+             cores   = 4,
+             # NUTS specific parameter for avoiding divergent transitions
+             control = list(adapt_delta = 0.90)
+  )
+
+```
+
+
+```{r linear_specs, eval =T, cache=T}
+
+linear_form <-
+  bf( rent_lc ~ income_bucket + size_lc + age + income_bucket + bedrooms )
+
+priors_linear <- c(  prior(normal(0, 10),  class = Intercept),
+                     prior(exponential(1), class = sigma),
+                     prior(normal(0, 10),  class = b) )
+
+# readRDS("linear_model.rds")
+
+linear_mod <- 
+  brm(
+    formula = linear_form,
+    data    = ste,
+    warmup  = 1000,
+    iter    = 3000,
+    prior   = priors_linear,
+    file    =  "linear_model",
+    chains  = 4,
+    cores   = 4
+  )
+
+```
+
+
+```{r fitted_draws, cache=T, eval = T}
+
+len <- 50
+n_draws <- 3000
+lv <- c("low-income", "middle-income", "high-income")
+
+
+# create new data to sample from the posterior
+new_data <-
+smooth_mod$data %>% 
+  modelr::data_grid(
+    bedrooms      = rep(2, len*3),
+    size_lc       = rep(0.59, len*3), # median size of 2 br apt, 1050 sqft
+    age           = modelr::seq_range(age, len*3),
+    income_bucket = rep(factor(1:3, labels = lv), len)
+  )
+
+
+# sample from the posterior 
+smooth_fits <- tidybayes::add_fitted_draws(new_data, smooth_mod, n = n_draws)
+linear_fits <- tidybayes::add_fitted_draws(new_data, linear_mod, n = n_draws)
+
+
+
+# convert from centered scale
+smooth_fits <- mutate(smooth_fits, rent = exp( (.value*sd_rent_log)+mean_rent_log ),
+                      model = "spline")
+linear_fits <- mutate(linear_fits, rent = exp( (.value*sd_rent_log)+mean_rent_log ),
+                      model = "linear")
+
+
+
+fits <- bind_rows(smooth_fits, linear_fits)
+fits <- fits %>% mutate(grp = str_c(.draw, model))
+
+```
+
+
+
+
+## Conditional effects
+
+#### Constructing the conditional effects plot
+
+My goal is to use this model to interpret the conditional effects of age on the price of rent. To do this I construct a fake dataset of 3,000 units, 1,000 for each income level, of 1,050 sq. ft, 2 bedroom apartment units and 50 evenly spaced age intervals. Each line-segment is a draw from the posterior. I also fit a linear-model with essentially equivalent specifications in order to have a benchmark for my splines-model. 
+
+```{r plot_draws, fig.align="center", fig.width=10,  eval = T}
+
+
+
+theme_set(theme_minimal()+
+            theme(plot.subtitle = element_text(size = 8),
+                  panel.grid.minor = element_blank()))
+
+
+# spline model
+title <- expr("Comparing Posterior Fits"-"Splines vs. Linear")
+subtitle <- expr('E[Rent|'*list(Age['BID[i]'], 'Unit size=1,050'*ft^2, 'Bedrooms=2]'))
+
+
+
+fits_plt <-
+fits %>% 
+  ggplot(aes(group = grp))+
+  geom_line(aes(age, rent,  color = model), lwd = .1, alpha = .08)+
+  geom_rug( sides = "b", color = "black", alpha  = .5, size = .3)+
+  facet_grid(~income_bucket)+
+  scale_y_log10(breaks = c( 3000, 4000, 5000, 6000, 7000), limits = c(2500, 7500))+
+  scale_x_continuous(breaks = c(0,25, 50, 75, 100, 125), limits  = c(0, 150))+
+  dutchmasters::scale_colour_dutchmasters("milkmaid")+
+  labs(title = title,
+       subtitle = subtitle)+
+  guides(colour = guide_legend(override.aes = list(alpha = 1, lwd = 1)))
+
+fits_plt
+
+
+
+```
+
+### Interpretation
+
+The two models are clearly very different. While my splines model shows that the relationship is clearly not linear, I'm not particularly satisfied with either model.
+
+#### Splines reveal cohort effects
+
+It's really hard to make sense of the splines model here, the shape that it takes in each income-bucket doesn't really make any sense right off the bat. Consider the conditional means in the *low-income* bucket. Strangely, the relationship between age and rent seems to increase before a sharp decrease. This doesn't make sense from a selection-bias point of view. With the selection bias story, we would expect a 'V' or a 'U' shape not a 'W'. Furthermore, the model looks *uncertain* about the relationship in this age-range. Let's look at the density of low-income apartments in this age range:
+
+```{r fig.height = 3.5, fig.width = 5, fig.align = "center", eval=T}
+ste %>% 
+  filter(income_bucket == 'low-income') %>% 
+  ggplot(aes(age))+
+  geom_histogram(fill = "grey70", color = "grey10", bins = 100)+
+  scale_x_continuous(sec.axis = sec_axis(~2014-., breaks = c(2014, 2014-25, 2014-50, 2014-100), name = "cohort"),
+                     breaks = c(0, 25, 50, 100))+
+  labs(title = "Age and cohort effects",
+       subtitle = str_wrap("Almost no units in low income neighborhoods were built between 1964-1989", 60))
+```
+
+The picture becomes a little bit more clear whats happening here, at least why the model is so uncertain for unit between 25 and 50 years old in low income neighborhoods-- the data is very sparse in the age range. Now as I mentioned in my post building [causal models](https://tfarley10.github.io/2020/09/27/are-old-apartments-cheaper-building-a-causal-model/) since the dataset is only from 2014, age is perfectly correlated with cohort, therefore we are subject to omitted variable bias. In this case it's very useful to think about what was *different* about low-income neighborhoods between 1964 and 1989, doing so will shed some light on the sparsity of the data in this time period. The '70s were a terrible time for New York, the city was facing a [fiscal crisis](https://indypendent.org/2020/07/kim-phillips-fein-what-nycs-fiscal-crisis-of-the-1970s-can-teach-us-today/), people were leaving the city in droves and, in the poorest of neighborhoods abandonment was so bad that it was not uncommon for landowners to [just burn their builings down](https://nypost.com/2010/05/16/why-the-bronx-burned/). 
+
+#### How are these cohort effects bias my models
+
+I have shown how cohort effects effect my model by making the sample sparse between c. 1965-- c. 1990. However the sparsity only suggests that my model will be more uncertain in this age range in low income neighborhoods a complete analysis of these cohort effects will take a lot more work and probably more data. A straightforward way out of this problem is to attain data for consecutive years. The more years of data used, the more these 1970's cohort effects could be spread out across age ranges. 
+
+# Conclusion
+
+In this post, using structure and insights gathered from builing my causal models, I specify my statistical model with both mathematical notation and code. I then fit the model and construct a conditional means plot by sampling from the posterior distribution of this model and making predictions with this fake data.
+
+I think the most important take-away from this is that the splines model was flexible enough to reveal the cohort bias I talk about in the final section. In contrast, the linear model hides these issues and severely biases the interpretation of the model. My next post is on model performance and using more formal metrics to evaluate both in-sample and out-of-sample performance of these models. In this post, my identification issues have become even more clear so it will be necessary to incorporate these issues into my discussion on model performance.
+
+[Next Post: Model Comparisons](https://tfarley10.github.io/2020/10/04/are-old-apartments-cheaper-model-comparison/)
+
+[Notebook for this post](https://github.com/tfarley10/blog_notebooks/blob/master/2020-10-03-are-old-apartments-cheaper-part-3.Rmd)
+
+
+[^rethinking]: McElreath, Richard. Statistical Rethinking a Bayesian Course with Examples in R and Stan. CRC Press, 2020. 
+
+[^mcelreath_blog]: https://elevanth.org/blog/2017/11/28/build-a-better-markov-chain/
+
+
+[^mgcv]: Wood SN (2011). “Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric generalized linear models.” Journal of the Royal Statistical Society (B), 73(1), 3-36.
+
+[^stan]: Stan Development Team. 2018. The Stan Core Library, Version 2.18.0.   http://mc-stan.org
+
+[^brms]: Bürkner P (2017). “brms: An R Package for Bayesian Multilevel Models Using Stan.” Journal of Statistical Software, 80(1), 1–28. doi: 10.18637/jss.v080.i01.
