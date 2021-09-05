@@ -10,3 +10,4 @@ Thumbs.db
 /resources/
 *.rd*
 *2021-07-24-dbt-pluto-first-post/
+*.parquet

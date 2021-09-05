@@ -1,0 +1,188 @@
+---
+title: 'Zoning Changes in NYC: 2002 - 2013'
+author: "Ted Farley"
+date: '2021-09-04'
+slug: []
+categories: []
+tags: [zoning]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F)
+```
+
+```{r libs, include = FALSE}
+library(here)
+library(tidyverse)
+```
+
+
+```{r get_data, cache=T, eval=FALSE}
+d <- arrow::read_parquet("data.parquet")
+```
+
+
+
+```{r make_pivot, cache = T, eval=FALSE}
+map_boro <- 
+tibble::tribble(
+  ~borough, ~borough_pretty,
+  "BK", "Brooklyn",
+  "BX", "Bronx",
+  "MN", "Manhattan",
+  "SI", "Staten Island",
+  "QN", "Queens"
+)
+
+d2 <- 
+d %>% 
+  mutate(diff = max_resid_allw_far - lag_max_resid_allw_far) %>% 
+  inner_join(map_boro)
+
+d3 <- 
+d2 %>% 
+  mutate(diff_cat = case_when(diff == 0 ~ 'no_change',
+                              diff > 0 ~ 'Upzone',
+                              diff < 0 ~ 'Downzone')) %>% 
+  mutate(dist_abbr = str_sub(primary_zoning_district, 0,2))
+
+year_piv <- 
+d3 %>% 
+  group_by(year, borough_pretty, diff_cat) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = (n/sum(n)),
+         prop = round(prop, 3)) %>% 
+  filter(diff_cat != "no_change")
+
+year_labels <- paste0('`', str_pad(c(2:13), width = 2, pad = "0"))
+```
+
+
+```{r save_pivot, cache = T, include = F}
+yp2 <- 
+year_piv %>% 
+  filter(year < 2014)
+```
+
+
+# Intro  
+
+blah blah
+
+
+## What is allowable floor area ratio?  
+
+Part of the zoning code restricts something called the ***floor area ratio (FAR)***. A shorthand way of thinking about *allowable* FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building[^1]. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is.  
+
+The chart below measures the proportion of lots in the 5 boroughs the were upzoned/downzoned during the Bloomberg administration.
+
+```{r plot, fig.width=6}
+fills <- c("#5ab4ac", "#d8b365")
+year_labels <- paste0('`', str_pad(c(2:13), width = 2, pad = "0"))
+
+yp2 %>% 
+ggplot(aes(x = year, y = prop, fill = diff_cat))+
+  geom_col(position = position_dodge(preserve = "single")) +
+  scale_x_continuous(breaks = c(2002:2013), labels = year_labels)+
+  scale_y_continuous(breaks = c(0.0,.04, .08), labels = scales::label_percent(accuracy = 1))+
+  labs(title = "Changes in Allowable FAR",
+       y = "% of Lots that were upzoned/downzoned\n")+
+  facet_wrap(borough_pretty~., nrow = 5)+
+  scale_fill_manual(values = fills)+
+  theme_minimal()+
+  theme(
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        # axis.title.y = element_blank(),
+        axis.title.x = element_blank())
+
+```
+
+
+```{r map_data, cache=TRUE}
+load(file = "g_data.rdata")
+
+fills <- c("#5ab4ac", "#d8b365", "gray90")
+
+d4 <- 
+d3 %>% 
+  mutate(diff_cat = coalesce(diff_cat, "No Change"),
+         diff_cat = factor(diff_cat, levels = c("Upzone", "Downzone", "No Change")))
+
+plt <- 
+d4 %>% 
+  ggplot()+
+  geom_sf(aes(fill = diff_cat), lwd = 0)+
+  scale_fill_manual(values = fills)+
+  theme_void()+
+  theme(legend.title = element_blank())
+```
+
+```{r map, cache=T}
+plt
+```
+
+
+
+
+
+---
+
+### Appendix
+
+```{sql bq_query, echo=T, eval = FALSE}
+
+with measures as (
+select 
+    lag_bbl_year_hash_id,
+    bbl,
+    year,
+    land_use_category,
+    max_resid_allw_far,
+    primary_zoning_district,
+    borough,
+    owner_type_category,
+    total_units,
+    lot_address,
+    has_residential
+
+from dbt_ted.lot_year
+where 
+    year > 2002
+
+),
+
+lag_measures as (
+    select 
+
+        bbl_year_hash_id as lag_bbl_year_hash_id,
+        land_use_category as lag_land_use_category,
+        max_resid_allw_far as lag_max_resid_allw_far,
+        primary_zoning_district as lag_primary_zoning_district,
+        owner_type_category as lag_owner_type_category,
+        total_units as lag_total_units,
+        bbl as lag_bbl,
+        has_residential as lag_has_residential,
+        historic_district as lag_historic_district
+
+    from dbt_ted.lot_year
+    where 
+        year < 2020
+),
+
+final as (
+select * except(lag_bbl_year_hash_id, lag_has_residential)
+from measures 
+inner join lag_measures using (lag_bbl_year_hash_id)
+where 
+    lag_has_residential = true
+)
+
+select * from final
+
+```
+
+
+[^1]: This is a simplified example. The [Wikipedia](https://en.wikipedia.org/wiki/Floor_area_ratio) page is very helpful here. 
+
+
