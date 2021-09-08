@@ -8,7 +8,7 @@ tags: [zoning]
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = T, warning = F, message = F)
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
 ```
 
 ```{r libs, include = FALSE}
@@ -16,14 +16,73 @@ library(here)
 library(tidyverse)
 ```
 
+```{r}
+theme_map <- function(...) {
+  theme_minimal() +
+  theme(
+    text = element_text(family = "Ubuntu Regular", color = "#22211d"),
+    axis.line = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_line(color = "#ebebe5", size = 0.2),
+    panel.grid.major = element_line(color = "#ebebe5", size = 0.2),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA), 
+    panel.background = element_rect(fill = "#f5f5f2", color = NA),
+    legend.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.border = element_blank(),
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = .5),
+    plot.subtitle = element_text(hjust = .5),
+    ...
+  )
+}
+```
 
-```{r get_data, cache=T, eval=FALSE}
+
+```{r map_data, cache=TRUE}
+load(file = "g_data.rdata")
+
+d4 <- 
+d3 %>% 
+  mutate(diff_cat = coalesce(diff_cat, "No Change"),
+         diff_cat = factor(diff_cat, levels = c("Upzone", "Downzone", "No Change")))
+```
+
+
+```{r make_map, cache=TRUE}
+
+fills <- c("#180F3EFF", "#F1605DFF", "grey85")
+
+title <- str_wrap("Changes in Zoning Restrictions in New York City", 50)
+subtitle <- "Max. Allowable FAR 2004 to 2014"
+caption <- "Source: NYC Planning MapPluto"
+
+plt <- 
+d4 %>% 
+  ggplot()+
+  geom_sf(aes(fill = diff_cat), lwd = 0)+
+  scale_fill_manual(values = fills)+
+  theme_map()+
+  labs(title = title,
+       subtitle = subtitle,
+       caption = caption)
+```
+
+```{r map, fig.width=10, fig.height=10, cache=TRUE}
+plt
+```
+
+
+```{r get_data, cache=T}
 d <- arrow::read_parquet("data.parquet")
 ```
 
 
 
-```{r make_pivot, cache = T, eval=FALSE}
+```{r make_pivot, cache = T}
 map_boro <- 
 tibble::tribble(
   ~borough, ~borough_pretty,
@@ -61,13 +120,14 @@ year_labels <- paste0('`', str_pad(c(2:13), width = 2, pad = "0"))
 ```{r save_pivot, cache = T, include = F}
 yp2 <- 
 year_piv %>% 
-  filter(year < 2014)
+  filter(year < 2014) %>% 
+  mutate(diff_cat = factor(diff_cat, levels = c("Upzone", "Downzone")))
 ```
 
 
 # Intro  
 
-blah blah
+blah blah blah 
 
 
 ## What is allowable floor area ratio?  
@@ -76,8 +136,8 @@ Part of the zoning code restricts something called the ***floor area ratio (FAR)
 
 The chart below measures the proportion of lots in the 5 boroughs the were upzoned/downzoned during the Bloomberg administration.
 
-```{r plot, fig.width=6}
-fills <- c("#5ab4ac", "#d8b365")
+```{r plot, fig.width=5}
+fills <- c("#180F3EFF", "#F1605DFF")
 year_labels <- paste0('`', str_pad(c(2:13), width = 2, pad = "0"))
 
 yp2 %>% 
@@ -97,33 +157,6 @@ ggplot(aes(x = year, y = prop, fill = diff_cat))+
         axis.title.x = element_blank())
 
 ```
-
-
-```{r map_data, cache=TRUE}
-load(file = "g_data.rdata")
-
-fills <- c("#5ab4ac", "#d8b365", "gray90")
-
-d4 <- 
-d3 %>% 
-  mutate(diff_cat = coalesce(diff_cat, "No Change"),
-         diff_cat = factor(diff_cat, levels = c("Upzone", "Downzone", "No Change")))
-
-plt <- 
-d4 %>% 
-  ggplot()+
-  geom_sf(aes(fill = diff_cat), lwd = 0)+
-  scale_fill_manual(values = fills)+
-  theme_void()+
-  theme(legend.title = element_blank())
-```
-
-```{r map, cache=T}
-plt
-```
-
-
-
 
 
 ---

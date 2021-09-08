@@ -10,82 +10,15 @@ tags: [zoning]
 <script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
 
 
-<pre class="r"><code>d &lt;- arrow::read_parquet(&quot;data.parquet&quot;)</code></pre>
-<pre class="r"><code>map_boro &lt;- 
-tibble::tribble(
-  ~borough, ~borough_pretty,
-  &quot;BK&quot;, &quot;Brooklyn&quot;,
-  &quot;BX&quot;, &quot;Bronx&quot;,
-  &quot;MN&quot;, &quot;Manhattan&quot;,
-  &quot;SI&quot;, &quot;Staten Island&quot;,
-  &quot;QN&quot;, &quot;Queens&quot;
-)
-
-d2 &lt;- 
-d %&gt;% 
-  mutate(diff = max_resid_allw_far - lag_max_resid_allw_far) %&gt;% 
-  inner_join(map_boro)
-
-d3 &lt;- 
-d2 %&gt;% 
-  mutate(diff_cat = case_when(diff == 0 ~ &#39;no_change&#39;,
-                              diff &gt; 0 ~ &#39;Upzone&#39;,
-                              diff &lt; 0 ~ &#39;Downzone&#39;)) %&gt;% 
-  mutate(dist_abbr = str_sub(primary_zoning_district, 0,2))
-
-year_piv &lt;- 
-d3 %&gt;% 
-  group_by(year, borough_pretty, diff_cat) %&gt;% 
-  summarise(n = n()) %&gt;% 
-  mutate(prop = (n/sum(n)),
-         prop = round(prop, 3)) %&gt;% 
-  filter(diff_cat != &quot;no_change&quot;)
-
-year_labels &lt;- paste0(&#39;`&#39;, str_pad(c(2:13), width = 2, pad = &quot;0&quot;))</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/map-1.png" width="960" /></p>
 <div id="intro" class="section level1">
 <h1>Intro</h1>
-<p>blah blah</p>
+<p>blah blah blah</p>
 <div id="what-is-allowable-floor-area-ratio" class="section level2">
 <h2>What is allowable floor area ratio?</h2>
 <p>Part of the zoning code restricts something called the <strong><em>floor area ratio (FAR)</em></strong>. A shorthand way of thinking about <em>allowable</em> FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is.</p>
 <p>The chart below measures the proportion of lots in the 5 boroughs the were upzoned/downzoned during the Bloomberg administration.</p>
-<pre class="r"><code>fills &lt;- c(&quot;#5ab4ac&quot;, &quot;#d8b365&quot;)
-year_labels &lt;- paste0(&#39;`&#39;, str_pad(c(2:13), width = 2, pad = &quot;0&quot;))
-
-yp2 %&gt;% 
-ggplot(aes(x = year, y = prop, fill = diff_cat))+
-  geom_col(position = position_dodge(preserve = &quot;single&quot;)) +
-  scale_x_continuous(breaks = c(2002:2013), labels = year_labels)+
-  scale_y_continuous(breaks = c(0.0,.04, .08), labels = scales::label_percent(accuracy = 1))+
-  labs(title = &quot;Changes in Allowable FAR&quot;,
-       y = &quot;% of Lots that were upzoned/downzoned\n&quot;)+
-  facet_wrap(borough_pretty~., nrow = 5)+
-  scale_fill_manual(values = fills)+
-  theme_minimal()+
-  theme(
-        legend.position = &quot;bottom&quot;,
-        legend.title = element_blank(),
-        # axis.title.y = element_blank(),
-        axis.title.x = element_blank())</code></pre>
-<p><img src="{{< blogdown/postref >}}index_files/figure-html/plot-1.png" width="576" /></p>
-<pre class="r"><code>load(file = &quot;g_data.rdata&quot;)
-
-fills &lt;- c(&quot;#5ab4ac&quot;, &quot;#d8b365&quot;, &quot;gray90&quot;)
-
-d4 &lt;- 
-d3 %&gt;% 
-  mutate(diff_cat = coalesce(diff_cat, &quot;No Change&quot;),
-         diff_cat = factor(diff_cat, levels = c(&quot;Upzone&quot;, &quot;Downzone&quot;, &quot;No Change&quot;)))
-
-plt &lt;- 
-d4 %&gt;% 
-  ggplot()+
-  geom_sf(aes(fill = diff_cat), lwd = 0)+
-  scale_fill_manual(values = fills)+
-  theme_void()+
-  theme(legend.title = element_blank())</code></pre>
-<pre class="r"><code>plt</code></pre>
-<p><img src="{{< blogdown/postref >}}index_files/figure-html/map-1.png" width="672" /></p>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/plot-1.png" width="480" /></p>
 <hr />
 <div id="appendix" class="section level3">
 <h3>Appendix</h3>
