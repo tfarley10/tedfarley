@@ -127,7 +127,6 @@ year_piv %>%
 
 # Intro  
 
-blah blah blah 
 
 
 ## What is allowable floor area ratio?  
