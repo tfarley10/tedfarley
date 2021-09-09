@@ -32,9 +32,10 @@ theme_map <- function(...) {
     plot.background = element_rect(fill = "#f5f5f2", color = NA), 
     panel.background = element_rect(fill = "#f5f5f2", color = NA),
     legend.background = element_rect(fill = "#f5f5f2", color = NA),
+    legend.position = c(.15, .95),
     panel.border = element_blank(),
     legend.title = element_blank(),
-    plot.title = element_text(hjust = .5),
+    plot.title = element_text(hjust = .5, size = 16),
     plot.subtitle = element_text(hjust = .5),
     ...
   )
@@ -42,18 +43,18 @@ theme_map <- function(...) {
 ```
 
 
-```{r map_data, cache=TRUE}
+```{r map_data, cache=TRUE, eval=TRUE}
 load(file = "g_data.rdata")
 
 d4 <- 
 d3 %>% 
-  mutate(diff_cat = coalesce(diff_cat, "No Change"),
-         diff_cat = factor(diff_cat, levels = c("Upzone", "Downzone", "No Change")))
+  mutate(diff_cat = coalesce(diff_cat, "No Change/Non-Residential"),
+         diff_cat = factor(diff_cat, levels = c("Upzone", "Downzone", "No Change/Non-Residential")))
 ```
 
 
-```{r make_map, cache=TRUE}
-
+```{r make_map, cache=TRUE, eval=TRUE}
+# update 
 fills <- c("#180F3EFF", "#F1605DFF", "grey85")
 
 title <- str_wrap("Changes in Zoning Restrictions in New York City", 50)
@@ -71,7 +72,8 @@ d4 %>%
        caption = caption)
 ```
 
-```{r map, fig.width=10, fig.height=10, cache=TRUE}
+```{r map, out.width = '100%', fig.width=12, fig.height=10, cache=TRUE}
+# upda
 plt
 ```
 
@@ -127,15 +129,17 @@ year_piv %>%
 
 # Intro  
 
+map[^1]
+
 
 
 ## What is allowable floor area ratio?  
 
-Part of the zoning code restricts something called the ***floor area ratio (FAR)***. A shorthand way of thinking about *allowable* FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building[^1]. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is.  
+Part of the zoning code restricts something called the ***floor area ratio (FAR)***. A shorthand way of thinking about *allowable* FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building[^2]. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is.  
 
 The chart below measures the proportion of lots in the 5 boroughs the were upzoned/downzoned during the Bloomberg administration.
 
-```{r plot, fig.width=5}
+```{r plot, fig.width=4, fig.align='center'}
 fills <- c("#180F3EFF", "#F1605DFF")
 year_labels <- paste0('`', str_pad(c(2:13), width = 2, pad = "0"))
 
@@ -215,6 +219,10 @@ select * from final
 ```
 
 
-[^1]: This is a simplified example. The [Wikipedia](https://en.wikipedia.org/wiki/Floor_area_ratio) page is very helpful here. 
+[^1]: [taken from here](https://timogrossenbacher.ch/2016/12/beautiful-thematic-maps-with-ggplot2-only/)
+
+
+
+[^2]: This is a simplified example. The [Wikipedia](https://en.wikipedia.org/wiki/Floor_area_ratio) page is very helpful here.  
 
 
