@@ -1,5 +1,5 @@
 ---
-title: 'Zoning Changes in NYC: 2002 - 2013'
+title: 'Zoning Changes in NYC: 2004 - 2014'
 author: "Ted Farley"
 date: '2021-09-04'
 slug: []
@@ -33,9 +33,10 @@ theme_map <- function(...) {
     panel.background = element_rect(fill = "#f5f5f2", color = NA),
     legend.background = element_rect(fill = "#f5f5f2", color = NA),
     legend.position = c(.15, .95),
+    legend.text = element_text(size = 15),
     panel.border = element_blank(),
     legend.title = element_blank(),
-    plot.title = element_text(hjust = .5, size = 16),
+    plot.title = element_text(hjust = .5, size = 18),
     plot.subtitle = element_text(hjust = .5),
     ...
   )
@@ -53,7 +54,7 @@ d3 %>%
 ```
 
 
-```{r make_map, cache=TRUE, eval=TRUE}
+```{r make_map, cache=TRUE}
 # update 
 fills <- c("#180F3EFF", "#F1605DFF", "grey85")
 
@@ -72,7 +73,7 @@ d4 %>%
        caption = caption)
 ```
 
-```{r map, out.width = '100%', fig.width=12, fig.height=10, cache=TRUE}
+```{r map, cache = T, out.width = '100%', fig.width=12, fig.height=10}
 # upda
 plt
 ```
@@ -164,7 +165,9 @@ ggplot(aes(x = year, y = prop, fill = diff_cat))+
 
 ---
 
-### Appendix
+### Technical Appendix
+
+This post is the first of a part of a larger project- my [pluto-panel](https://github.com/tfarley10/pluto-panel/tree/main/dbt)
 
 ```{sql bq_query, echo=T, eval = FALSE}
 
