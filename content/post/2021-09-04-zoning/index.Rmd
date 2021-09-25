@@ -4,7 +4,7 @@ author: "Ted Farley"
 date: '2021-09-04'
 slug: []
 categories: []
-tags: [zoning]
+tags: [land-use, data-warehouse]
 ---
 
 ```{r setup, include=FALSE}
@@ -73,6 +73,7 @@ d4 %>%
        caption = caption)
 ```
 
+
 ```{r map, cache = T, out.width = '100%', fig.width=12, fig.height=10}
 # upda
 plt
@@ -128,19 +129,23 @@ year_piv %>%
 ```
 
 
-# Intro  
+## The importance of panel data for land-use analysis 
 
-map[^1]
+Zoning regulations are very important. They are one of the major determinants in housing supply and therefore have a huge effect on housing affordability. While understanding the *current state* of zoning regulations is very important, analyzing changes in the zoning code over time can illuminate trends in these regulations. Luckily, the [NYC Department of City Planning](https://nycplanning.github.io/db-pluto/#/) has meticulously kept records on the state of land-use regulations going back to 2002. This allows me to combine records from every year to create an panel data-set for each lot. 
+
+## Whis is it so hard to make sense of zoning regulations?  
+
+Zoning, and land-use restrictions are difficult to analyze using data. For one, the zoning code is complex and regulations can be multi-dimensional. For example, the code can decrease the minimum lot size (decreasing restrictiveness) while increasing minimum parking requirements (increasing restrictiveness) both at the same time. Further, the most impactful changes to the zoning code have happened slowly over time in ways that are hard to measure.   
 
 
 
 ## What is allowable floor area ratio?  
 
-Part of the zoning code restricts something called the ***floor area ratio (FAR)***. A shorthand way of thinking about *allowable* FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building[^2]. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is.  
+Part of the zoning code restricts something called the ***floor area ratio (FAR)***. A shorthand way of thinking about *allowable* FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building[^2]. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is. The above map[^1] shows changes in *floor area ratio* between 2004 and 2014 for each lot in New York City.  
 
 The chart below measures the proportion of lots in the 5 boroughs the were upzoned/downzoned during the Bloomberg administration.
 
-```{r plot, fig.width=4, fig.align='center'}
+```{r plot, fig.width=4.5, fig.align='center'}
 fills <- c("#180F3EFF", "#F1605DFF")
 year_labels <- paste0('`', str_pad(c(2:13), width = 2, pad = "0"))
 
@@ -165,9 +170,9 @@ ggplot(aes(x = year, y = prop, fill = diff_cat))+
 
 ---
 
-### Technical Appendix
+### PLUTO-Panel Project
 
-This post is the first of a part of a larger project- my [pluto-panel](https://github.com/tfarley10/pluto-panel/tree/main/dbt)
+This post is the first of a part of a larger project- my [pluto-panel](https://github.com/tfarley10/pluto-panel/tree/main/dbt). The purpose of the project is to unite land-use, real estate and demographics data for NYC from several sources of public data and maintain a data warehouse to make these siloed data sources easily accessible for data analysis. This is very much so a work in process, but, below is an example query of how I can use this strategy to easily create the facted bar-plot seen above.
 
 ```{sql bq_query, echo=T, eval = FALSE}
 
@@ -186,9 +191,6 @@ select
     has_residential
 
 from dbt_ted.lot_year
-where 
-    year > 2002
-
 ),
 
 lag_measures as (
@@ -206,7 +208,7 @@ lag_measures as (
 
     from dbt_ted.lot_year
     where 
-        year < 2020
+        year =< 2014
 ),
 
 final as (
@@ -222,7 +224,7 @@ select * from final
 ```
 
 
-[^1]: [taken from here](https://timogrossenbacher.ch/2016/12/beautiful-thematic-maps-with-ggplot2-only/)
+[^1]: the theme for this map was taken from Timo Grossenbacher's [excellent blog post](https://timogrossenbacher.ch/2016/12/beautiful-thematic-maps-with-ggplot2-only/) on making thematic maps in ggplot2
 
 
 

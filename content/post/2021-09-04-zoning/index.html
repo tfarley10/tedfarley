@@ -4,25 +4,30 @@ author: "Ted Farley"
 date: '2021-09-04'
 slug: []
 categories: []
-tags: [zoning]
+tags: [land-use, data-warehouse]
 ---
 
 <script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
 
 
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/map-1.png" width="100%" /></p>
-<div id="intro" class="section level1">
-<h1>Intro</h1>
-<p>map<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></p>
+<div id="the-importance-of-panel-data-for-land-use-analysis" class="section level2">
+<h2>The importance of panel data for land-use analysis</h2>
+<p>Zoning regulations are very important. They are one of the major determinants in housing supply and therefore have a huge effect on housing affordability. While understanding the <em>current state</em> of zoning regulations is very important, analyzing changes in the zoning code over time can illuminate trends in these regulations. Luckily, the <a href="https://nycplanning.github.io/db-pluto/#/">NYC Department of City Planning</a> has meticulously kept records on the state of land-use regulations going back to 2002. This allows me to combine records from every year to create an panel data-set for each lot.</p>
+</div>
+<div id="whis-is-it-so-hard-to-make-sense-of-zoning-regulations" class="section level2">
+<h2>Whis is it so hard to make sense of zoning regulations?</h2>
+<p>Zoning, and land-use restrictions are difficult to analyze using data. For one, the zoning code is complex and regulations can be multi-dimensional. For example, the code can decrease the minimum lot size (decreasing restrictiveness) while increasing minimum parking requirements (increasing restrictiveness) both at the same time. Further, the most impactful changes to the zoning code have happened slowly over time in ways that are hard to measure.</p>
+</div>
 <div id="what-is-allowable-floor-area-ratio" class="section level2">
 <h2>What is allowable floor area ratio?</h2>
-<p>Part of the zoning code restricts something called the <strong><em>floor area ratio (FAR)</em></strong>. A shorthand way of thinking about <em>allowable</em> FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a>. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is.</p>
+<p>Part of the zoning code restricts something called the <strong><em>floor area ratio (FAR)</em></strong>. A shorthand way of thinking about <em>allowable</em> FAR is just how high you are allowed to build on a given lot. When the allowable-FAR is 2.0 a developer can build a 2-story building on her lot, when her allowable FAR is 1.0 then she can only build on 1-story building<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>. Allowable FAR is on of the few standardized numeric metrics for measuring how restrictive the zoning code is. The above map<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a> shows changes in <em>floor area ratio</em> between 2004 and 2014 for each lot in New York City.</p>
 <p>The chart below measures the proportion of lots in the 5 boroughs the were upzoned/downzoned during the Bloomberg administration.</p>
-<p><img src="{{< blogdown/postref >}}index_files/figure-html/plot-1.png" width="384" style="display: block; margin: auto;" /></p>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/plot-1.png" width="432" style="display: block; margin: auto;" /></p>
 <hr />
-<div id="technical-appendix" class="section level3">
-<h3>Technical Appendix</h3>
-<p>This post is the first of a part of a larger project- my <a href="https://github.com/tfarley10/pluto-panel/tree/main/dbt">pluto-panel</a></p>
+<div id="pluto-panel-project" class="section level3">
+<h3>PLUTO-Panel Project</h3>
+<p>This post is the first of a part of a larger project- my <a href="https://github.com/tfarley10/pluto-panel/tree/main/dbt">pluto-panel</a>. The purpose of the project is to unite land-use, real estate and demographics data for NYC from several sources of public data and maintain a data warehouse to make these siloed data sources easily accessible for data analysis. This is very much so a work in process, but, below is an example query of how I can use this strategy to easily create the facted bar-plot seen above.</p>
 <pre class="sql"><code>
 with measures as (
 select 
@@ -39,9 +44,6 @@ select
     has_residential
 
 from dbt_ted.lot_year
-where 
-    year &gt; 2002
-
 ),
 
 lag_measures as (
@@ -59,7 +61,7 @@ lag_measures as (
 
     from dbt_ted.lot_year
     where 
-        year &lt; 2020
+        year =&lt; 2014
 ),
 
 final as (
@@ -74,11 +76,10 @@ select * from final
 </code></pre>
 </div>
 </div>
-</div>
 <div class="footnotes">
 <hr />
 <ol>
-<li id="fn1"><p><a href="https://timogrossenbacher.ch/2016/12/beautiful-thematic-maps-with-ggplot2-only/">taken from here</a><a href="#fnref1" class="footnote-back">↩︎</a></p></li>
-<li id="fn2"><p>This is a simplified example. The <a href="https://en.wikipedia.org/wiki/Floor_area_ratio">Wikipedia</a> page is very helpful here.<a href="#fnref2" class="footnote-back">↩︎</a></p></li>
+<li id="fn1"><p>This is a simplified example. The <a href="https://en.wikipedia.org/wiki/Floor_area_ratio">Wikipedia</a> page is very helpful here.<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>the theme for this map was taken from Timo Grossenbacher’s <a href="https://timogrossenbacher.ch/2016/12/beautiful-thematic-maps-with-ggplot2-only/">excellent blog post</a> on making thematic maps in ggplot2<a href="#fnref2" class="footnote-back">↩︎</a></p></li>
 </ol>
 </div>
