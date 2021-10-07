@@ -23,7 +23,7 @@ While this type of itervention is abstract and impossible, we can use regression
 
 ## Some confounders
 
-Unfortunately, with observational data there are many challenges to overcome when trying to identify causal effects. Posiibly the most well known is the *confounding variable bias.* The confounding variable bias occurs when your outcome of interest and your predictor of interest are conditional on some other variable. In this analysis we technically have 2 predictor variables of interest: Neighborhood income and building age. Now consider that a lower income family  looking for a 2 bedroom apartment has preferences for smaller apartments because they are less expensive (they probably do). Without conditioning on unit size, we will bias our estimates of Neighborhood on the price of a rental unit. 
+Unfortunately, with observational data there are many challenges to overcome when trying to identify causal effects. Possibly the most well known is the *confounding variable bias.* The confounding variable bias occurs when your outcome of interest and your predictor of interest are conditional on some other variable. In this analysis we technically have 2 predictor variables of interest: Neighborhood income and building age. Now consider that a lower income family  looking for a 2 bedroom apartment has preferences for smaller apartments because they are less expensive (they probably do). Without conditioning on unit size, we will bias our estimates of Neighborhood on the price of a rental unit. 
 
 ```{r size_dag, out.width="50%", fig.align='center', echo=F}
 
@@ -84,9 +84,9 @@ I have introduced several potential biases in identifying filtering effects, pre
 
 - they force you to justify every variable in your model to avoid shutting an already open path.
 
-Importantly, using DAGs for this analysis has shed more light on the limitations in the dataset as I've identified two biaes that I can't find a back-door path to solve: the cohort effects, and selection effects. With these issues unresolved, I'll continue with the analysis keeping in mind that statisticasl inference needs to be taken with a grain-of-salt. In my next post, i'll use information from my causal models to justify and build a statistical model of filtering.
+Importantly, using DAGs for this analysis has shed more light on the limitations in the dataset as I've identified two biases that I can't find a back-door path to solve: the cohort effects, and selection effects. With these issues unresolved, I'll continue with the analysis keeping in mind that statistical inference needs to be taken with a grain-of-salt. In my next post, I'll use information from my causal models to justify and build a statistical model of filtering.
 
-[Next Post: Building a Statistical Model](https://tfarley10.github.io/2020/10/03/are-old-apartments-cheaper-part-3/)
+[Next Post: Building a Statistical Model](https://tedfarley.netlify.app/post/2020-10-04-are-old-apartments-cheaper-model-comparison/)
 
 
 

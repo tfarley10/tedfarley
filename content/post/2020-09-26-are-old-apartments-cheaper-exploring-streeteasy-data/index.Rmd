@@ -437,7 +437,7 @@ I have explored the economics literature on *filtering effect* in the housing ma
 
 </br>
 
-[Next post: Causal Models](https://tfarley10.github.io/2020/09/27/are-old-apartments-cheaper-building-a-causal-model/)
+[Next post: Causal Models](https://tedfarley.netlify.app/post/2020-09-27-are-old-apartments-cheaper-building-a-causal-model/)
 
 Heres the [notebook for this post](https://github.com/tfarley10/blog_notebooks/blob/master/2020-09-26-are-old-apartments-cheaper-part-1.Rmd)
 
