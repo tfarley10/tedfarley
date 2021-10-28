@@ -25,7 +25,7 @@ params:
 menu:
   icon:
     - name: fas fa-envelope
-      url: mailto:me@example.com
+      url: mailto:tfarley1990@gmail.com
       weight: 1
     - name: fab fa-github
       url: https://github.com/tfarley10/
