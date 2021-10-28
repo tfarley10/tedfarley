@@ -1,0 +1,76 @@
+---
+title: exponential decay
+author: Ted Farley
+date: '2021-10-27'
+slug: []
+categories: []
+tags: []
+description: ''
+---
+
+
+
+
+```{r, echo=FALSE}
+htmltools::tagList(
+  xaringanExtra::use_clipboard(
+    button_text = "<i class=\"fa fa-clipboard\"></i>",
+    success_text = "<i class=\"fa fa-check\" style=\"color: #90BE6D\"></i>",
+  ),
+  rmarkdown::html_dependency_font_awesome()
+)
+```
+
+```{sql, eval = F}
+
+with data as (
+    select 'claire' as name, date('2021-10-04') as week, 3 as points_this_week, 3.00 as score_this_week
+    union all
+    select 'claire' as name, date('2021-10-11') as week, 1 as points_this_week, 3.70 as score_this_week
+    union all
+    select 'claire' as name, date('2021-10-18') as week, 2 as points_this_week, 5.33 as score_this_week
+    union all
+    select 'claire' as name, date('2021-10-25') as week, 0 as points_this_week, 4.797 as score_this_week
+),
+
+t as (
+    select 
+        *,
+        row_number() over (
+            partition by name
+            order by week desc
+        ) - 1 as week_count
+    from data
+),
+
+t1 as (
+    select
+        *,
+        points_this_week * power(0.9, week_count) as decayed_points
+    from t
+),
+
+t2 as (
+    select
+        *,
+        sum(decayed_points) over (
+            partition by name
+            order by week
+            rows between unbounded preceding and current row
+        ) as decayed_points_cumulative
+    from t1
+),
+
+
+t3 as (
+    select
+        *,
+        decayed_points_cumulative / power(0.9, week_count) as score_this_week_calc
+    from t2
+)
+
+select * from t3
+
+```
+
+

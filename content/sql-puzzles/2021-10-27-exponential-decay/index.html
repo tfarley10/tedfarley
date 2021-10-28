@@ -1,0 +1,68 @@
+---
+title: exponential decay
+author: Ted Farley
+date: '2021-10-27'
+slug: []
+categories: []
+tags: []
+description: ''
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+<script src="{{< blogdown/postref >}}index_files/clipboard/clipboard.min.js"></script>
+<link href="{{< blogdown/postref >}}index_files/xaringanExtra-clipboard/xaringanExtra-clipboard.css" rel="stylesheet" />
+<script src="{{< blogdown/postref >}}index_files/xaringanExtra-clipboard/xaringanExtra-clipboard.js"></script>
+<script>window.xaringanExtraClipboard(null, {"button":"<i class=\"fa fa-clipboard\"><\/i>","success":"<i class=\"fa fa-check\" style=\"color: #90BE6D\"><\/i>","error":"Press Ctrl+C to Copy"})</script>
+<link href="{{< blogdown/postref >}}index_files/font-awesome/css/all.css" rel="stylesheet" />
+<link href="{{< blogdown/postref >}}index_files/font-awesome/css/v4-shims.css" rel="stylesheet" />
+
+
+<pre class="sql"><code>
+with data as (
+    select &#39;claire&#39; as name, date(&#39;2021-10-04&#39;) as week, 3 as points_this_week, 3.00 as score_this_week
+    union all
+    select &#39;claire&#39; as name, date(&#39;2021-10-11&#39;) as week, 1 as points_this_week, 3.70 as score_this_week
+    union all
+    select &#39;claire&#39; as name, date(&#39;2021-10-18&#39;) as week, 2 as points_this_week, 5.33 as score_this_week
+    union all
+    select &#39;claire&#39; as name, date(&#39;2021-10-25&#39;) as week, 0 as points_this_week, 4.797 as score_this_week
+),
+
+t as (
+    select 
+        *,
+        row_number() over (
+            partition by name
+            order by week desc
+        ) - 1 as week_count
+    from data
+),
+
+t1 as (
+    select
+        *,
+        points_this_week * power(0.9, week_count) as decayed_points
+    from t
+),
+
+t2 as (
+    select
+        *,
+        sum(decayed_points) over (
+            partition by name
+            order by week
+            rows between unbounded preceding and current row
+        ) as decayed_points_cumulative
+    from t1
+),
+
+
+t3 as (
+    select
+        *,
+        decayed_points_cumulative / power(0.9, week_count) as score_this_week_calc
+    from t2
+)
+
+select * from t3
+</code></pre>

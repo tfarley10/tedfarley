@@ -3,7 +3,6 @@ languageCode: en-us
 title: ted's blog
 theme: minimal
 disqusShortname: username
-googleAnalytics: ''
 params:
   accent: red
   author: Calin Tataru
@@ -20,6 +19,7 @@ params:
     - swift
     - sql
     - r
+  pygmentsUseClasses: true
   highlightStyle: default
   showBorder: yes
 menu:
@@ -49,6 +49,6 @@ menu:
     - name: Posts
       url: /post/
       weight: 3
-    # - name: Projects
-    #   url: /project/
+    # - name: SQL Puzzles
+    #   url: /sql-puzzles/
     #   weight: 4
