@@ -1,0 +1,155 @@
+---
+title: do-calculus to Specify causality
+author: Ted Farley
+date: '2021-11-02'
+slug: []
+categories: []
+tags: [causal-inference, ols]
+---
+
+```{r setup, echo=F}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+```
+
+# Entry-level analyst puzzle 
+
+Last week [Benn Eifert](https://twitter.com/bennpeifert) (a quantitative-finance guy[^1]) posted this puzzle on twitter last week. The puzzle was intriguing to me but it would have taken me a few weeks to solve on my own, luckily Benn posted the answer yesterday! Below is the puzzle & answer along with Benn's interpretation. I then split hairs over specifying correlation/causation and suggest using 'do-calculus' to be more explicit about causal relationships. 
+
+## The prompt  
+
+>Saturday morning entry-level analyst interview question.  
+The variable Y is caused by Z, plus some i.i.d. noise e:
+
+\begin{align*}
+Y_{t} & = a_{0} + a_{1}Z_{t} + e_{t} \\
+\end{align*}
+
+>But Z also happens to be correlated with some other variable X: 
+
+\begin{align*}
+X_{t} & = b_{0} + b_{1}Z_{t} + f_{t}
+\end{align*}
+
+
+>You're an internet troll so you ignore Z and just estimate the univariate relationship via ordinary least squares regression: 
+
+\begin{align*}
+Y_{t} & = c_{0} + c_{1}X_{t} + g_{t} \\\\
+\hat{c}_{1} & = \frac{\hat{cov}(Y_{t}, X_{t})}{\hat{var}(X_{t})}
+\end{align*}  
+
+> Derive the estimate of c1 that you will obtain via OLS and explain.
+
+
+## The answer
+
+substitute $RHS$ of $Y_{t}$ and $X_{t}$ in:
+
+</br>  
+
+
+\begin{align*}
+  \hat{c}_{1} & = \frac{\hat{cov}(a_{0} + a_{1}Z_{t} + e_{t}, b_{0} + b_{1}Z_{t} + f_{t})}{\hat{var}(X_{t})}  
+\end{align*}  
+
+additive terms can be ignored (intercept estimates and error terms):
+
+\begin{align*}
+  \hat{c}_{1} & = \frac{\hat{cov}(a_{1}Z_{t},b_{1}Z_{t})}{\hat{var}(X_{t})}  
+\end{align*}  
+
+pull out constant terms:  
+
+\begin{align*}
+  \hat{c}_{1} & = b_{1} * a_{1}\frac{\hat{cov}(Z_{t}, Z_{t})}{\hat{var}(X_{t})} 
+\end{align*} 
+
+\begin{align*} 
+   \hat{c}_{1} & = b_{1} * a_{1}\frac{\hat{var}(Z_{t})}{\hat{var}(X_{t})}
+\end{align*}  
+
+## Benn's interpretation  
+
+>So we infer a (false) relationship between $Y$ and $X$, proportional to the (true) relationship between $Y$ and $Z$, and the correlation between $X$ and $Z$.
+
+## Causal Model's can be helpful!  
+
+```{r size_dag, out.width="50%", fig.align='center', echo=F, eval=F}
+
+library(ggdag)
+library(dagitty)
+library(tidyverse)
+library(patchwork) 
+
+dag1 <- dagitty("dag{y <- z -> x}")
+dag2 <- dagitty("dag{y <- z <- x}")
+
+foo <- ggdag(dag1, layout = "circle", text_size = 7)+
+  theme_dag()+
+  labs(title = "Z causes X")+
+   theme(plot.title = element_text(size=22))
+
+ bar <- ggdag(dag2, layout = "circle", text_size = 7)+
+   theme_dag()+
+   labs(title = "X causes Z")+
+   theme(plot.title = element_text(size=22))
+
+ foo +  bar
+
+```
+
+
+I think the main purpose of the question was in deriving an OLS estimate for $Y(X)$ given the relationships of $X(Z)$ and $Y(Z)$ which is shown in the algebra above. To be clear I would have failed miserably at deriving this estimate, but I enjoyed following along with the answer.  
+
+It is true that no matter what, $X$ and $Y$ are independent of each other when you condition on $Z$.
+
+\begin{align*}
+  E[Y | Z, X] = E[Y | Z]
+\end{align*}  
+
+
+However, I think there were some important ambiguities in the prompt and Benn's interpretation of the estimate. Primarily, Benn posits that the relationship between $X \sim Y$ is 'false'. I think what he means here is that the OLS estimate, interpreted as a measure of causality is spurious in this case. Benn says, *"Z also happens to be correlated with some other variable X"*. However, the causal relationship between $X \sim Y$ is only 'false' if we specify that the correlation between $X$ and $Z$ is $Z \rightarrow X$ ($Z$ causes $X$).  
+
+## Specifying Causality using 'do-calculus'
+
+Using *do-calculus* allows us to 'play-god'. In the 'analyst puzzle' we ask: "if you alter $X$ and nothing else, would $Y$ change"? If $Z \rightarrow X$ then we would expect the following to hold:
+
+\begin{align*}
+  E[Y | do(X = x_{0})] = E[Y | do(X = x_{1})]
+\end{align*} 
+
+alternatively, if $X \rightarrow Z$ then we would expect:
+
+\begin{align*}
+E[Y | do(X = x_{0})] \neq E[Y | do(X = x_{1})]
+\end{align*}  
+
+
+*do-calculus* seems really pointless when working with observational data mostly because non-one will ever get to *actually* play god. Where it's most useful for me (a causal-inference hobbyist) is using it to specify exactly what I mean by "X causes Y", conditional dependence is not enough to do this. For example it is tempting to say that because:
+
+\begin{align*}
+  E[Y | Z, X] = E[Y | Z]
+\end{align*} 
+
+there is no causal relationship between $X \sim Y$. However, conditioning on $Y$ may be masking the true causal relationship. Determining causality is really tricky business, counter-intuitive relationships are everywhere and using the wrong conditional dependencies can lead you down the wrong path. This, I think, is a good reason to use causal models that are seperate (and come before) your statistical models. 
+
+# The original tweets
+
+## prompt: 
+</br>  
+
+```{r echo=FALSE}
+blogdown::shortcode('tweet', '1454494974238625795')
+```
+
+## answer:  
+</br> 
+
+```{r echo=FALSE}
+blogdown::shortcode('tweet', '1454494972556701699')
+```
+_____
+  
+[^1]: he also writes [sql code](https://twitter.com/bennpeifert/status/1453003455325421583?s=20) 
+
+
