@@ -1,5 +1,5 @@
 ---
-title: 'Zoning Changes in NYC: 2004 - 2014 [WIP!!]'
+title: 'Zoning Changes in NYC: 2004 - 2014'
 author: "Ted Farley"
 date: '2021-09-04'
 slug: []
@@ -44,7 +44,7 @@ theme_map <- function(...) {
 ```
 
 
-```{r map_data, cache=TRUE, eval=TRUE}
+```{r map_data, cache=TRUE}
 load(file = "g_data.rdata")
 
 d4 <- 
