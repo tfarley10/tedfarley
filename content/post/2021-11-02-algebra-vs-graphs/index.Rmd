@@ -34,8 +34,7 @@ X_{t} & = b_{0} + b_{1}Z_{t} + f_{t}
 >You're an internet troll so you ignore Z and just estimate the univariate relationship via ordinary least squares regression: 
 
 \begin{align*}
-Y_{t} & = c_{0} + c_{1}X_{t} + g_{t} \\\\
-\hat{c}_{1} & = \frac{\hat{cov}(Y_{t}, X_{t})}{\hat{var}(X_{t})}
+Y_{t} & = c_{0} + c_{1}X_{t} + g_{t}
 \end{align*}  
 
 > Derive the estimate of c1 that you will obtain via OLS and explain.
