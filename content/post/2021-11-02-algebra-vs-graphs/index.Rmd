@@ -133,6 +133,8 @@ E[Y | do(X = x_{0})] \neq E[Y | do(X = x_{1})]
 
 there is no causal relationship between $X \sim Y$. However, conditioning on $Y$ may be masking the true causal relationship. Determining causality is really tricky business, counter-intuitive relationships are everywhere and using the wrong conditional dependencies can lead you down the wrong path. This, I think, is a good reason to use causal models that are seperate (and come before) your statistical models. 
 
+------------
+
 # The original tweets
 
 ## prompt: 
@@ -148,7 +150,7 @@ blogdown::shortcode('tweet', '1454494974238625795')
 ```{r echo=FALSE}
 blogdown::shortcode('tweet', '1454494972556701699')
 ```
-_____
+
   
 [^1]: he also writes [sql code](https://twitter.com/bennpeifert/status/1453003455325421583?s=20) 
 
