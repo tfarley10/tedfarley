@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
 
 # Entry-level analyst puzzle 
 
-Last week [Benn Eifert](https://twitter.com/bennpeifert) (a quantitative-finance guy[^1]) posted this puzzle on twitter last week. The puzzle was intriguing to me but it would have taken me a few weeks to solve on my own, luckily Benn posted the answer yesterday! Below is the puzzle & answer along with Benn's interpretation. I then split hairs over specifying correlation/causation and suggest using 'do-calculus' to be more explicit about causal relationships. 
+Last week [Benn Eifert](https://twitter.com/bennpeifert) posted this puzzle on twitter last week. The puzzle was intriguing to me but it would have taken me a few weeks to solve on my own, luckily Benn posted the answer yesterday! Below is the puzzle & answer along with Benn's interpretation. I then split hairs over specifying correlation/causation and suggest using 'do-calculus' to be more explicit about causal relationships. 
 
 ## The prompt  
 
@@ -154,7 +154,5 @@ blogdown::shortcode('tweet', '1454494974238625795')
 blogdown::shortcode('tweet', '1454494972556701699')
 ```
 
-  
-[^1]: he also writes [sql code](https://twitter.com/bennpeifert/status/1453003455325421583?s=20) 
 
 

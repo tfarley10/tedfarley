@@ -5,9 +5,6 @@ date: '2021-11-06'
 slug: []
 categories: []
 tags: []
-output: 
-  html_document:
-    highlight: kate
 ---
 
 <script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
@@ -36,8 +33,7 @@ create table employees as
   (6006,2002,&#39;Engineer&#39;)) employees(id, manager_id, title);
   </code></pre>
 <pre class="sql"><code>
-
-with recursive counter as (
+with recursive employees_cte as (
 
   select -- base-case select statement
     id,
@@ -50,18 +46,18 @@ with recursive counter as (
   select 
   
     employees.id,
-    counter.depth + 1 -- only iterates when the next subordinate is found
+    employees_cte.depth + 1 -- only iterates when the next subordinate is found
   
   from employees
-  inner join counter on --implicit recursive call
-        employees.manager_id = counter.id -- defines the stopping condition
+  inner join employees_cte on --implicit recursive call
+        employees.manager_id = employees_cte.id -- defines the stopping condition
   
 )
 
-select &#39;Employee &#39; || id || &#39; depth is &#39; || depth as output from counter;</code></pre>
+select &#39;Employee &#39; || id || &#39; depth is &#39; || depth as output from employees_cte;</code></pre>
 <div class="knitsql-table">
 <table>
-<caption><span id="tab:unnamed-chunk-3">Table 1: </span>6 records</caption>
+<caption><span id="tab:unnamed-chunk-2">Table 1: </span>6 records</caption>
 <thead>
 <tr class="header">
 <th align="left">output</th>
@@ -89,18 +85,15 @@ select &#39;Employee &#39; || id || &#39; depth is &#39; || depth as output from
 </tbody>
 </table>
 </div>
-<div id="the-cte-calling-itself" class="section level3">
-<h3>The CTE calling itself</h3>
-<pre class="sql"><code>inner join counter</code></pre>
-<pre class="sql"><code>employees.manager_id = counter.id</code></pre>
-<pre class="python"><code>
-ids=[1001, 2002, 3003, 4004, 5005, 6006]
+<div id="lets-compare-this-to-python" class="section level3">
+<h3>Lets compare this to python</h3>
+<pre class="py"><code>ids=[1001, 2002, 3003, 4004, 5005, 6006]
 mgr_ids=[None, 1001, 1001, 2002, 2002, 2002]
 
 
 def getDistance(pos):
     
-    # base case
+    # stopping condition
     if mgr_ids[pos] is None:
         return 0
     
@@ -109,8 +102,6 @@ def getDistance(pos):
             
             # recursive step
             return 1 + getDistance(i)
-
-
 
 for i in range(0,len(ids)):
     print(f&#39;Employee {ids[i]}  depth is  {getDistance(i)}&#39;)</code></pre>
@@ -121,6 +112,35 @@ for i in range(0,len(ids)):
 ## Employee 5005  depth is  2
 ## Employee 6006  depth is  2</code></pre>
 </div>
+<div id="the-cte-calling-itself" class="section level3">
+<h3>The CTE calling itself</h3>
+<p>The first reason that I find SQL recursion confusing is because the recursive step happens in an inner join. When we <em>inner join</em> the <code>employees</code> table on <code>employees_cte</code> we are implicitly calling the CTE on itself.</p>
+<pre class="sql"><code>inner join employees_cte</code></pre>
+<p>In python this step is very explicit:</p>
+<pre class="python"><code>def getDistance(pos):
+  ...
+  ...
+  return 1 + getDistance(i) # recursive step</code></pre>
+</div>
+<div id="stopping-condition-as-a-join" class="section level3">
+<h3>Stopping condition as a join</h3>
+<p>The second way that SQL obscures recursive operations is that the stopping condition is actually in the join predicate:</p>
+<pre class="sql"><code>employees.manager_id = counter.id</code></pre>
+<p>this is why you can only do inner join’s with recursive CTE’s. The recursive query needs the limitations of an <em>inner join</em> or else it will call itself infinitely.</p>
+<p>Compare this to the python code:</p>
+<pre class="python"><code>def getDistance(pos):
+    
+    # stopping condition
+    if mgr_ids[pos] is None:
+        return 0
+    ...
+    ...</code></pre>
+<p>it’s much easier to spot the stopping condition in python because its very explicitly stated in an if-else statement.</p>
+</div>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>I’ve never used a recursive query to solve a problem at work but that’s probably because I haven’t known how to do them for very long! While I can’t find any cases where I would need to use them, <a href="https://haughtcodeworks.com/blog/software-development/recursive-sql-queries-using-ctes/">here is at least one person</a> that needed them! In this post, I have outlined how recursion can dramatically simplify a certain type of problem. I have also shown that some of the abstractions that make SQL so wonderful can actually make it’s recursive functionality more difficult to understand.</p>
 </div>
 <div class="footnotes">
 <hr />

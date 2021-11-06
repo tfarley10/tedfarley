@@ -5,16 +5,17 @@ date: '2021-11-06'
 slug: []
 categories: []
 tags: []
-output: 
-  html_document:
-    highlight: kate
 ---
 ```{r setup, echo=F}
 knitr::opts_chunk$set(echo = T, message = F, warning = F)
-```
-
-```{r echo = FALSE}
-library(reticulate)
+# knitr::knit_engines$set(list(python = "/Users/edwardfarley/Library/r-miniconda/envs/r-reticulate/bin/python"))
+knitr::knit_engines$set(py = function(options) {
+  code <- paste(options$code, collapse = '\n')
+  out  <- system2(
+    'python', c('-c', shQuote(code)), stdout = TRUE
+  )
+  knitr::engine_output(options, code, out)
+})
 ```
 
 ```{r, echo = F}
@@ -57,8 +58,7 @@ create table employees as
 
 ```{sql connection=con}
 
-
-with recursive counter as (
+with recursive employees_cte as (
 
   select -- base-case select statement
     id,
@@ -71,38 +71,35 @@ with recursive counter as (
   select 
   
     employees.id,
-    counter.depth + 1 -- only iterates when the next subordinate is found
+    employees_cte.depth + 1 -- only iterates when the next subordinate is found
   
   from employees
-  inner join counter on --implicit recursive call
-        employees.manager_id = counter.id -- defines the stopping condition
+  inner join employees_cte on --implicit recursive call
+        employees.manager_id = employees_cte.id -- defines the stopping condition
   
 )
 
-select 'Employee ' || id || ' depth is ' || depth as output from counter;
-```
-
-### The CTE calling itself
-```{sql connection = con, eval=F}
-inner join counter
-```
-
-```{sql connection = con, eval=F}
-employees.manager_id = counter.id
+select 'Employee ' || id || ' depth is ' || depth as output from employees_cte;
 ```
 
 
+### Lets compare this to python 
+
+```{r retic, echo=F}
+library(reticulate)
+```
 
 
-```{python, cache = T}
 
+
+```{py}
 ids=[1001, 2002, 3003, 4004, 5005, 6006]
 mgr_ids=[None, 1001, 1001, 2002, 2002, 2002]
 
 
 def getDistance(pos):
     
-    # base case
+    # stopping condition
     if mgr_ids[pos] is None:
         return 0
     
@@ -112,13 +109,69 @@ def getDistance(pos):
             # recursive step
             return 1 + getDistance(i)
 
-
-
 for i in range(0,len(ids)):
     print(f'Employee {ids[i]}  depth is  {getDistance(i)}')
 ```
 
+
+
+
+### The CTE calling itself
+
+The first reason that I find SQL recursion confusing is because the recursive step happens in an inner join. When we *inner join* the `employees` table on `employees_cte` we are implicitly calling the CTE on itself.
+
+
+```{sql connection = con, eval=F}
+inner join employees_cte
+```
+
+In python this step is very explicit:
+
+```{python, eval = F}
+def getDistance(pos):
+  ...
+  ...
+  return 1 + getDistance(i) # recursive step
+```
+
+### Stopping condition as a join
+
+The second way that SQL obscures recursive operations is that the stopping condition is actually in the join predicate:
+
+
+```{sql connection = con, eval=F}
+employees.manager_id = counter.id
+```
+
+
+this is why you can only do inner join's with recursive CTE's. The recursive query needs the limitations of an *inner join* or else it will call itself infinitely. 
+
+Compare this to the python code:
+
+```{python, eval = F}
+def getDistance(pos):
+    
+    # stopping condition
+    if mgr_ids[pos] is None:
+        return 0
+    ...
+    ...
+```
+
+it's much easier to spot the stopping condition in python because its very explicitly stated in an if-else statement.
+
+## Conclusion
+
+I've never used a recursive query to solve a problem at work but that's probably because I haven't known how to do them for very long! While I can't find any cases where I would need to use them, [here is at least one person](https://haughtcodeworks.com/blog/software-development/recursive-sql-queries-using-ctes/) that needed them! In this post, I have outlined how recursion can dramatically simplify a certain type of problem. I have also shown that some of the abstractions that make SQL so wonderful can actually make it's recursive functionality more difficult to understand. 
+
+
+
+
+
+
 [^1]: I got it from Puzzle #2: Managers and Employees, [here](https://github.com/smpetersgithub/AdvancedSQLPuzzles/blob/main/Advanced%20SQL%20Puzzles/Advanced%20SQL%20Puzzles.pdf)
+
+
 
 
 
