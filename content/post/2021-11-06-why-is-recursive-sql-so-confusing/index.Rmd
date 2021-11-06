@@ -1,0 +1,127 @@
+---
+title: Why is recursive sql so confusing?
+author: Ted Farley
+date: '2021-11-06'
+slug: []
+categories: []
+tags: []
+output: 
+  html_document:
+    highlight: kate
+---
+```{r setup, echo=F}
+knitr::opts_chunk$set(echo = T, message = F, warning = F)
+```
+
+```{r echo = FALSE}
+library(reticulate)
+```
+
+```{r, echo = F}
+library(duckdb)
+library("DBI")
+con = dbConnect(duckdb::duckdb(), ":memory:")
+```
+
+Recursion is useful when trying to represent hierarchical relationships. The trouble with relational SQL is that is is difficult and confusing to represent hierarchies from rectangular relations-- hierarchies are best represented by trees.
+
+## Distance from CEO problem
+
+Below, I'll give an example of a very simple use-case for recursive sql: The depth from president problem[^1]. The problem is, given an unique `employee_id` and `manager_id` that relates to another employee can you tell how 'far removed' the given employee is from the CEO of the company. 
+
+The example looks innocent enough until you consider that the solution should be able generalize to companies with arbitrary organizational structures. The generalized solution requires recursion. Below I'll give the solution to the problem in SQL and then in python. I'll explain why I think the SQL solution is more confusing to me than the python solution.
+
+
+
+
+
+```{sql ddl, connection=con}
+/*
+Make the `employees` table.
+I include titles here to make the setup more intuitive
+*/
+
+create table employees as 
+  select 
+    * 
+  from (
+  values 
+  (1001,null,'CEO'),
+  (2002,1001,'Director'),
+  (3003,1001,'Office Manager'),
+  (4004,2002,'Engineer'),
+  (5005,2002,'Engineer'),
+  (6006,2002,'Engineer')) employees(id, manager_id, title);
+  
+```
+
+```{sql connection=con}
+
+
+with recursive counter as (
+
+  select -- base-case select statement
+    id,
+    0 as depth
+  from employees
+  where title = 'CEO'
+
+  union all 
+
+  select 
+  
+    employees.id,
+    counter.depth + 1 -- only iterates when the next subordinate is found
+  
+  from employees
+  inner join counter on --implicit recursive call
+        employees.manager_id = counter.id -- defines the stopping condition
+  
+)
+
+select 'Employee ' || id || ' depth is ' || depth as output from counter;
+```
+
+### The CTE calling itself
+```{sql connection = con, eval=F}
+inner join counter
+```
+
+```{sql connection = con, eval=F}
+employees.manager_id = counter.id
+```
+
+
+
+
+```{python, cache = T}
+
+ids=[1001, 2002, 3003, 4004, 5005, 6006]
+mgr_ids=[None, 1001, 1001, 2002, 2002, 2002]
+
+
+def getDistance(pos):
+    
+    # base case
+    if mgr_ids[pos] is None:
+        return 0
+    
+    for i in range(0, len(ids)):
+        if ids[i] == mgr_ids[pos]:
+            
+            # recursive step
+            return 1 + getDistance(i)
+
+
+
+for i in range(0,len(ids)):
+    print(f'Employee {ids[i]}  depth is  {getDistance(i)}')
+```
+
+[^1]: I got it from Puzzle #2: Managers and Employees, [here](https://github.com/smpetersgithub/AdvancedSQLPuzzles/blob/main/Advanced%20SQL%20Puzzles/Advanced%20SQL%20Puzzles.pdf)
+
+
+
+
+
+

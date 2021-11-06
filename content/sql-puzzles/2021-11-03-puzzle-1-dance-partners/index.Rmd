@@ -1,0 +1,21 @@
+---
+title: 'Puzzle #1: Dance Partners'
+author: Ted Farley
+date: '2021-11-03'
+slug: []
+categories: []
+tags: []
+description: ''
+---
+
+[advanced sql puzzles](https://advancedsqlpuzzles.com/)
+
+```{r}
+library("DBI")
+con = dbConnect(duckdb::duckdb(), dbdir=":memory:", read_only=FALSE)
+```
+
+```{sql, connection = con}
+select true
+```
+

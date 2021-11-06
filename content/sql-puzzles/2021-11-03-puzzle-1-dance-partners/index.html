@@ -1,0 +1,32 @@
+---
+title: 'Puzzle #1: Dance Partners'
+author: Ted Farley
+date: '2021-11-03'
+slug: []
+categories: []
+tags: []
+description: ''
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+
+
+<p><a href="https://advancedsqlpuzzles.com/">advanced sql puzzles</a></p>
+<pre class="r"><code>library(&quot;DBI&quot;)
+con = dbConnect(duckdb::duckdb(), dbdir=&quot;:memory:&quot;, read_only=FALSE)</code></pre>
+<pre class="sql"><code>select true</code></pre>
+<div class="knitsql-table">
+<table>
+<caption><span id="tab:unnamed-chunk-2">Table 1: </span>1 records</caption>
+<thead>
+<tr class="header">
+<th align="left">CAST(t AS BOOLEAN)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">TRUE</td>
+</tr>
+</tbody>
+</table>
+</div>
