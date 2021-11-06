@@ -44,7 +44,7 @@ theme_map <- function(...) {
 ```
 
 
-```{r map_data, cache=TRUE}
+```{r map_data, cache=TRUE, eval = F}
 load(file = "g_data.rdata")
 
 d4 <- 
@@ -54,7 +54,7 @@ d3 %>%
 ```
 
 
-```{r make_map, cache=TRUE}
+```{r make_map, cache=TRUE, eval = F}
 # update 
 fills <- c("#180F3EFF", "#F1605DFF", "grey85")
 
@@ -80,7 +80,7 @@ plt
 ```
 
 
-```{r get_data, cache=T}
+```{r get_data, cache=T, eval = F}
 d <- arrow::read_parquet("data.parquet")
 ```
 
