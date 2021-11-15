@@ -4,7 +4,7 @@ author: Ted Farley
 date: '2021-11-06'
 slug: []
 categories: []
-tags: []
+tags: [sql]
 ---
 ```{r setup, echo=F}
 knitr::opts_chunk$set(echo = T, message = F, warning = F)
