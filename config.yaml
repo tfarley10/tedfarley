@@ -19,6 +19,7 @@ params:
     - swift
     - sql
     - r
+    - sql
   pygmentsUseClasses: true
   highlightStyle: default
   showBorder: yes
