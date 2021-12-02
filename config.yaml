@@ -53,3 +53,6 @@ menu:
     # - name: SQL Puzzles
     #   url: /sql-puzzles/
     #   weight: 4
+    - name: NYC Land Use Warehouse
+      url: /docs/
+      weight: 4

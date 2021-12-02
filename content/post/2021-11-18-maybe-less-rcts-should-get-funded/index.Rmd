@@ -1,0 +1,29 @@
+---
+title: Maybe less RCTs should get funded
+author: Ted Farley
+date: '2021-11-18'
+slug: []
+categories: []
+tags: []
+---
+[Ivermectin: Much More Than You Wanted To Know](https://astralcodexten.substack.com/p/ivermectin-much-more-than-you-wanted)
+
+[Gelman, Jamaica](https://statmodeling.stat.columbia.edu/2014/08/08/estimated-effect-early-childhood-intervention-downgraded-42-25/)
+
+```{r}
+library(tidyverse)
+
+X <- replicate(10**3, rnorm(24, .1, 1), simplify = F)
+  
+ted_test <- function(vec){
+  bar <- t.test(vec)
+  qux <- broom::tidy(bar)
+  return(qux)
+}
+
+xx <- map_dfr(X, ted_test)
+
+xx %>% 
+  filter(p.value < .05)
+```
+
