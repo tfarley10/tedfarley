@@ -56,4 +56,4 @@ select
     row_number() over(partition by job_id order by latest_action_date desc) as job_recency_rank
 from final
   );
-    
+  

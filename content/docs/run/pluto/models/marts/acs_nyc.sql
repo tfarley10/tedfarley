@@ -7,7 +7,7 @@
   as (
     
 with acs as (
-    select * from `pluto-panel`.`dbt_ted`.`stg_acs_agg`
+    select * replace(cast(year as integer) as year) from `pluto-panel`.`dbt_ted`.`stg_acs_agg`
 ),
 
 nyc_pumas as (
@@ -22,4 +22,4 @@ select
 from acs 
 inner join nyc_pumas using (geo_id)
   );
-    
+  

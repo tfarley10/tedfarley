@@ -70,4 +70,4 @@ select
     * 
 from final
   );
-    
+  

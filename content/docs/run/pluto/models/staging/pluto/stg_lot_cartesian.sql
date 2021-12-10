@@ -65,4 +65,4 @@ select
 from final
 group by 1
   );
-    
+  

@@ -47,4 +47,4 @@ select
     borough_block_centroid
 from final
   );
-    
+  

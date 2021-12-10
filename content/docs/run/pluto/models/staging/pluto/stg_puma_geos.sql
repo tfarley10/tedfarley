@@ -14,4 +14,4 @@ select
 
 from `pluto-panel.metadata.puma_geography`
   );
-    
+  
